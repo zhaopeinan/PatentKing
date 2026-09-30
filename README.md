@@ -1,631 +1,323 @@
-<h1 align="center">PatentKing 专利王</h1>
+# PatentKing
 
 <p align="center">
-  <strong>面向成果转化的开源专利智能体</strong><br/>
-  <strong>An open-source patent agent for technology transfer</strong>
+  <strong>专利王</strong><br/>
+  面向成果转化的专利智能体<br/>
+  A patent agent for technology transfer
 </p>
 
 <p align="center">
-  交底撰写 · 现有技术查新 · 审查意见答复 · 案件管理<br/>
-  Disclosure drafting · Prior-art search · Office-action replies · Matter management
-</p>
-
-PatentKing（专利王）把成果从技术材料推进到可交付的专利文稿。它跑在 [Apboa Next](https://github.com/huxuehao/apboa-next) 智能体平台上：平台负责模型、技能、会话和多租户；PatentKing 负责案件、交底流水线和专利工具。模型密钥、交底范文、论文原文和本地运行数据留在你自己的环境里，不随仓库发布。
-
-PatentKing moves a technical result toward a deliverable patent draft. It runs on the [Apboa Next](https://github.com/huxuehao/apboa-next) agent platform: the platform handles models, skills, sessions, and tenants; PatentKing handles matters, the disclosure pipeline, and patent tools. API keys, disclosure samples, source papers, and local run data stay in your own environment and are not published with this repository.
-
-## 能做什么 / What it does
-
-| 能力 | Capability | 说明 |
-|------|------------|------|
-| 交底撰写 | Disclosure drafting | 整理发明点，生成交底书，并导出 Word |
-| 现有技术查新 | Prior-art search | 检索对比文献，辅助判断新颖性 |
-| 论文转专利 | Paper to patent | 把论文材料整理成专利申请底稿 |
-| 审查答复 | Office-action reply | 整理创造性答辩提纲 |
-| 侵权对照 | Infringement / FTO | 按公开号做产品与权利要求对照 |
-| 案件管理 | Matter management | 按类型跟踪版本、会话和产物 |
-
-本地开发、Docker 启动和密钥配置见 [docs/dev-environment.md](docs/dev-environment.md)。案件模型与专利工具的取舍见 [docs/architecture/adr-001-matter-and-tools.md](docs/architecture/adr-001-matter-and-tools.md)。
-
-## 仓库里没有什么 / What is not in this repo
-
-- 模型 API Key、Tokenlab 生图密钥。在控制台里配置，不写进代码。
-- 交底金标准与论文 PDF（`ground_truth_file/`、`test/`）。目录说明还在，文件请本地自备。
-- 数据库、向量库、容器日志（`docker/data/`、`docker/logs/`）。
-- 第三方技能仓库里的专利评测集和全文包。需要时按 [patent-skills/README.md](patent-skills/README.md) 自行克隆。
-
-## 上游 / Upstream
-
-框架代码来自 Apboa Next，版权归 StudiousTiger，协议为 MIT。官方主站优先更新：[Gitee](https://gitee.com/studioustiger/apboa-next)，并同步到 [GitHub](https://github.com/huxuehao/apboa-next)。本仓库在其上增加 PatentKing 业务模块。
-
-The framework is Apboa Next, copyright StudiousTiger, MIT licensed. Upstream publishes first on [Gitee](https://gitee.com/studioustiger/apboa-next) and mirrors to [GitHub](https://github.com/huxuehao/apboa-next). This repository adds the PatentKing domain on top of that framework.
-
----
-
-以下为上游框架说明。The sections below describe the upstream framework.
-
-<h1 align="center">Apboa Next</h1>
-
-<p align="center">
-  <strong>企业级 AI 智能体平台 — 从定义到生产</strong>
-</p>
-
-<p align="center">
-  基于 ReAct 范式的多租户智能体构建与运行平台<br/>
-  <code>MCP 协议</code> · <code>A2A 协作</code> · <code>多向量存储</code> · <code>一键部署</code>
+  <a href="#中文">中文</a> · <a href="#english">English</a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Java-21-007396?logo=openjdk&logoColor=white" alt="Java 21"/>
   <img src="https://img.shields.io/badge/Spring%20Boot-3.4-6DB33F?logo=springboot&logoColor=white" alt="Spring Boot 3.4"/>
-  <img src="https://img.shields.io/badge/AgentScope-1.0-FF6B35" alt="AgentScope 1.0"/>
   <img src="https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vuedotjs&logoColor=white" alt="Vue 3.5"/>
-  <img src="https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white" alt="Docker Ready"/>
+  <img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white" alt="Docker Compose"/>
   <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License"/>
 </p>
 
-> **仓库镜像**：本项目的官方主站为 [https://gitee.com/studioustiger/apboa-next](https://gitee.com/studioustiger/apboa-next)，最新代码将优先发布在主站上，并定期同步至 [https://github.com/huxuehao/apboa-next](https://github.com/huxuehao/apboa-next)。推荐通过 Gitee 主站获取最新版本。
+PatentKing 把一份技术材料推进到可以审阅的专利文稿。它跑在 [Apboa Next](https://github.com/huxuehao/apboa-next) 上：平台管模型、会话、技能和租户；本仓库管案件、交底流水线和专利工具。
 
-Apboa Next 是基于ReAct理念的智能体开发与管理平台，旨在简化AI智能体的构建流程，帮助用户快速打造专属数字助手。平台整合了敏感词过滤、提示词管理、多模型接入、工具集成、知识库和智能体编排等核心功能，形成一站式解决方案，架构清晰，易于使用。
+PatentKing takes a technical write-up through to a patent draft you can review. It runs on [Apboa Next](https://github.com/huxuehao/apboa-next). The platform owns models, sessions, skills, and tenants. This repository owns matters, the disclosure pipeline, and the patent tooling.
 
-## 目录
+模型密钥、交底范文和运行数据留在你的环境里。下面两节是同一套启动步骤，分别用中文和英文写完。
 
-- [快速开始](#快速开始)
-- [本地开发](#本地开发)
-- [核心特性](#核心特性)
-- [系统架构](#系统架构)
-- [为什么选择 Apboa](#为什么选择-apboa)
-- [能力清单](#能力清单)
-- [技术栈](#技术栈)
-- [核心页面预览](#核心页面预览)
-- [部署指南](#部署指南)
-- [项目结构](#项目结构)
-- [贡献指南](#贡献指南)
-- [交流与赞助](#交流与赞助)
-- [开源协议](#开源协议)
-- [Workflow 专题](#workflow-可视化工作流引擎)
+Model keys, disclosure samples, and runtime data stay in your environment. The two sections below are the same procedure, written out in full in each language.
 
-## 快速开始
+## 中文
 
-前置条件：Docker Engine 20+ & Docker Compose v2+
+### 这个仓库做什么
 
-```bash
-git clone https://gitee.com/studious_tiger/apboa-next.git
-cd apboa-next/docker
-bash start-simple.sh
-```
+PatentKing 是成果转化场景下的专利工作台，覆盖六件事：
 
-启动完成后访问 `http://localhost`，默认账号 `admin / Admin@123.com`。
+| 能力 | 你得到什么 |
+|------|------------|
+| 交底撰写 | 发明点清单、交底书，以及 Word 导出 |
+| 现有技术查新 | 对比文献检索，供新颖性判断使用 |
+| 论文转专利 | 按论文材料整理的申请底稿 |
+| 审查答复 | 创造性答辩提纲 |
+| 侵权对照 | 按公开号整理的产品与权利要求对照 |
+| 案件管理 | 按类型保存的版本、会话和产物 |
 
-> 单机体验版包含全部 5 个服务 + 3 个中间件，约 5 分钟完成初始化。生产部署请参考 [docker-compose-execute.yml](docker/docker-compose-execute.yml)。
+案件在侧栏「成果转化 → 案件」，地址是 `/web/#/patent-matters`。架构取舍写在 [docs/architecture/adr-001-matter-and-tools.md](docs/architecture/adr-001-matter-and-tools.md)。
 
-## 本地开发
+### 启动之前
 
-### 环境要求
+需要 Docker Engine 20 或更高版本，以及 Docker Compose v2。宿主机不必安装 JDK、Maven 或 Node：首次构建在镜像里完成。
 
-| 依赖 | 版本 | 说明 |
-|------|------|------|
-| JDK | 21+ | 后端编译与运行 |
-| Maven | 3.8+ | 后端构建 |
-| MySQL | 8.0+ | 主数据库，库名 `apboa_next` |
-| Redis | 7+ | 缓存与分布式锁 |
-| Node.js | 20.19+ 或 22.12+ | 前端运行 |
-| pnpm | 9+ | 前端包管理 |
+单机编排包含 MySQL、Redis、pgvector，以及控制台、运行时、网关、WebSocket、Shell 代理、前端和专利工具。`docker/.env.simple` 里 Runtime 与 Gateway 的内存上限各是 4 GB。给 Docker 留出能撑住这组上限的内存；机器吃紧时先改这份文件里的 `*_MEM_LIMIT`。
 
-### 1. 初始化中间件
-1111
-2222
-
-
-确保 MySQL 和 Redis 已启动。创建数据库并导入初始化脚本：
+### 启动
 
 ```bash
-# 创建数据库
-mysql -u root -p -e "CREATE DATABASE apboa_next DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"
-
-# 导入表结构与初始数据（仅首次部署需要）
-mysql -u root -p apboa_next < sql/db_init.sql
+git clone https://github.com/zhaopeinan/PatentKing.git
+cd PatentKing
+bash scripts/pk-dev.sh build
 ```
 
-> 首次初始化后，后续表结构变更全部由 Flyway 自动管理：`runner-console` 启动时会按序执行 `db/migration` 目录下的增量脚本（`V2__xxx.sql` 起，见 [runner-console/src/main/resources/db/migration](runner-console/src/main/resources/db/migration)），无需手工比对或执行 SQL。
+这条命令会做三件事：确认 Docker 已经起来；把 `docker/.env.simple` 复制为 `docker/.env`；执行 `docker compose up -d --build`。拉起来的服务是：
 
-### 2. 配置后端
+| 容器 | 作用 | 宿主机端口 |
+|------|------|------------|
+| `apboa-mysql` | 主库 `apboa_next` | 3306 |
+| `apboa-redis` | 缓存与锁 | 6379 |
+| `apboa-pgvector` | 向量库 | 5432 |
+| `apboa-console` | 管理 API，技能导入走这里 | 3060 |
+| `apboa-runtime` | 智能体运行时 | 容器内 3061 |
+| `apboa-gateway` | 工作流对外端口，使用宿主机网络 | 直接绑在本机 |
+| `apboa-proxy` | Shell 执行代理 | 3062 |
+| `apboa-websocket` | 推送 | 3064 |
+| `patentking-patent-tools` | 查新、附图、Word | 3070 |
+| `apboa-frontend` | Nginx | 80 |
 
-各 Runner 模块使用 `application-dev.yml` 作为本地开发配置，部分模块提供了 `application-dev.sample.yml` 模板，复制并按需修改即可。
+第一次构建要拉取基础镜像，并在镜像内编译 Java 和前端，耗时会明显长于以后的启动。看状态：
 
 ```bash
-# runner-console
-cp runner-console/src/main/resources/application-dev.sample.yml runner-console/src/main/resources/application-dev.yml
-
-# runner-runtime
-cp runner-runtime/src/main/resources/application-dev.sample.yml runner-runtime/src/main/resources/application-dev.yml
+bash scripts/pk-dev.sh status
 ```
 
-编辑 `application-dev.yml`，填入本地的 MySQL、Redis 连接信息（地址、端口、密码）。
+浏览器打开 <http://localhost>。Nginx 把 `/` 重定向到 `/web/`。
 
-### 3. 依次启动后端服务
+本地初始账号是 `admin` / `Admin@123.com`。这是上游单机镜像自带的演示口令，只用于本机。服务一旦暴露到局域网或公网，先把口令换掉。
 
-按以下顺序在 IDE 或终端中启动三个 Java 服务：
-
-| 顺序 | 模块 | 启动类 | 端口 |
-|------|------|--------|------|
-| 1 | runner-console | `ConsoleApplication` | 3060 |
-| 2 | runner-runtime | `RuntimeApplication` | 3061 |
-| 3 | runner-websocket | `WebsocketApplication` | 3064 |
-
-> **说明：** `runner-file`（技能文件同步服务）仅在分布式 Docker 部署时需要，本地开发无需启动。
-
-### 4. 启动前端
+数据在 `docker/data/`。这个目录不进 Git。停止和拆除：
 
 ```bash
-cd ui
-pnpm install
-pnpm dev
+bash scripts/pk-dev.sh stop   # 停容器，数据还在
+bash scripts/pk-dev.sh down   # 删除容器和网络，docker/data 仍保留
 ```
 
-前端开发服务器启动后访问 `http://localhost:3030`，Vite 已内置代理配置：
+改端口时编辑 `docker/.env.simple` 的 `FRONTEND_PORT`，再执行一次 `build`。管理脚本每次启动都会用 `.env.simple` 覆盖 `docker/.env`。
 
-- `/api` → `http://127.0.0.1:3060`（Console）
-- `/api/runtime/` → `http://127.0.0.1:3061`（Runtime）
-- `/api/ws/` → `http://127.0.0.1:3064`（WebSocket）
+### 登录之后
 
-默认账号 `admin / Admin@123.com`。
+仓库不内置商业模型密钥。对话前先在控制台配好模型，再导入技能。顺序不要倒过来：导入脚本会把默认智能体绑到当前租户里第一个已启用的模型。
 
----
+1. 进入「开发 → 模型供应商」，填写 Base URL 和 API Key。密钥进平台的租户密钥，不要写回仓库。
+2. 进入「模型配置」，启用具体模型并确认连通。
+3. 克隆专利技能。这五套仓库带有专利全文和评测集，因此不放进 PatentKing。`PatentRadar` 体积最大。
 
-## 核心特性
+```bash
+mkdir -p patent-skills
+cd patent-skills
+git clone https://github.com/handsomestWei/patent-disclosure-skill.git handsomestWei-patent-disclosure-skill
+git clone https://github.com/AqooDer/patent-mining-disclosure-skill.git patent-mining-disclosure-skill
+git clone https://github.com/fuyuxiang/patent-disclosure-skill.git fuyuxiang-patent-disclosure-skill
+git clone https://github.com/7toCR/paper2patent.git paper2patent
+git clone https://github.com/yuc16/PatentRadar.git PatentRadar
+cd ..
+bash scripts/pack-skills.sh
+bash scripts/pk-import-skills.sh
+```
 
-### 🧠 ReAct 智能体引擎
+`pk-import-skills.sh` 登录 `http://127.0.0.1:3060`，上传技能包，并创建四名智能体：交底、论文转专利、侵权对照、口述交底。账号可通过环境变量覆盖：
 
-ReAct（Reasoning + Acting）循环驱动，内置 PlanNotebook 任务规划、AutoContext 记忆压缩、长期记忆（Mem0 / ReMe / Bailian），支持树状消息分支与多 Session 并行。
+```bash
+PK_USER=admin PK_PASS='your-password' bash scripts/pk-import-skills.sh
+```
 
-### 🔌 MCP 协议
+4. 打开「成果转化 → 案件」，新建案件，再从案件进入会话。
+5. 交底附图默认可以用本机 mermaid 渲染。若要 Tokenlab 自动出图，到「系统设置 → PatentKing 生图」填写 API Key。Key 只存在服务端配置里。
 
-HTTP / SSE / STDIO 三协议 MCP 客户端。LazyMcpAgentTool 实现懒加载——注册阶段仅绑定 Schema，首次调用时建立连接。连续失败达阈值自动降级。
+自检：
 
-### 🤖 多模型适配器
+```bash
+curl -s http://127.0.0.1:3070/healthz
+```
 
-统一模型工厂适配 OpenAI · DashScope · Anthropic · Gemini · Ollama · OrcaRouter 六大供应商。Agent 级参数覆盖（temperature / topP / topK / seed），无需改代码切换供应商。
+返回成功即表示专利工具已在监听。浏览器能登录，并且「案件」页能打开，单机环境就齐了。
 
-### 📚 知识库与 RAG
+### 镜像拉不动时
 
-四种知识库后端（百炼 / Dify / RagFlow / 本地向量库），五种向量存储（PgVector / Milvus / Elasticsearch / Qdrant / Weaviate）。内置文档解析 → 分块 → 嵌入 → 存储全流水线。
+大陆网络访问 Docker Hub 经常超时。OrbStack 可以先写镜像加速再构建：
 
-### 🛡️ 安全沙箱
+```bash
+bash scripts/pk-dev.sh mirror --pull
+bash scripts/pk-dev.sh build
+```
 
-Shell 命令通过独立 Proxy 进程执行，Docker 容器 `cap_drop: ALL` + `read_only` + `pids_limit` 最小权限运行。Python / Node.js / Shell / HTML 四语言安全扫描引擎。
+其他 Docker 环境在 daemon 上配置 `registry-mirrors`，或设置 `docker/.env.simple` 里的 `DOCKER_REGISTRY`。细节在 [docs/dev-environment.md](docs/dev-environment.md)。
 
-### 🏢 多租户 SaaS
+### 只改前端或后端时
 
-完整多租户体系：租户发现、申请、审批流程，双层 RBAC（平台 3 级 + 租户 4 级）。MyBatis-Plus 租户拦截器自动注入，48 张业务表数据完全隔离。
+日常使用不需要把服务拆开跑。要改 UI 或 Java 时，中间件仍用 Docker，应用在宿主机启动。步骤、端口和样例配置见 [docs/dev-environment.md](docs/dev-environment.md)。上游框架的原文说明在 [docs/apboa-framework.md](docs/apboa-framework.md)。多机部署见 [docker/README.md](docker/README.md)。
 
-### 🔄 Workflow 可视化工作流引擎
+### 仓库里故意没有的东西
 
-**30+ 开箱即用节点，让复杂业务流程像搭积木一样简单。**
+- 模型 API Key 和 Tokenlab 密钥。
+- `ground_truth_file/` 下的交底范文，以及 `test/` 下的论文 PDF。目录说明还在，文件请自己放。
+- `docker/data/`、`docker/logs/` 和 `docker/.env`。
+- 第三方技能检出，以及其中的专利评测数据。
 
-Apboa Workflow 是平台的核心能力之一，提供企业级可视化工作流编排引擎。通过拖拽式操作，用户可以快速构建包含 AI 智能体调用、数据库操作、外部 API 集成、消息队列推送等复杂业务流程，无需编写代码。
+### 目录
 
-**核心亮点：**
-
-| 特性 | 说明 |
+| 路径 | 内容 |
 |------|------|
-| **30+ 节点类型** | 基础（START/END）、逻辑（IF_ELSE/LOOP/ITERATE/MATCH）、数据（DB CRUD）、缓存（Cache CRUD）、消息（MQ）、集成（AGENT/TOOL/MCP/HTTP/CODE）、转换（String/Split/Template/Serialize）、列表（Filter/Sort）、变量（Agg） |
-| **可视化编排** | 基于 Vue Flow 的画布引擎，拖拽节点、自动连线、对齐辅助线、小地图导航 |
-| **灵活数据绑定** | 四种输入来源：常量、变量、节点输出、Groovy 表达式，BFS 算法自动发现上游节点 |
-| **实时调试** | 执行轨迹可视化、节点级耗时统计、失败节点自动高亮、错误即时定位 |
-| **模板引擎** | 支持 String / Velocity / JSON 三种模板格式化器 |
-| **子工作流** | LOOP 节点支持内嵌子工作流，实现复杂循环逻辑 |
-| **桥接解耦** | workflow 模块定义接口，engine 模块提供实现，独立演进 |
+| `biz/biz-pk-matter` | 案件、导出、查新和引导逻辑 |
+| `docker/` | 单机编排与 `patent-tools` 镜像 |
+| `ui/src/views/PatentKing` | 案件界面 |
+| `patent-skills/tokenlab-imagegen` | 随仓库发布的出图技能 |
+| `scripts/pk-dev.sh` | 启动、停止、专利工具和镜像加速 |
+| `docs/` | 环境说明、架构决策、上游框架说明 |
 
-**典型应用场景：**
+### 上游
 
-- **智能客服**：接收消息 → AI 分析意图 → 条件分支 → 知识库查询 → 生成回答
-- **数据处理**：数据源 → 查询 → 迭代处理 → 格式化 → 缓存 → 消息通知
-- **多系统集成**：事件触发 → API 调用 → AI 决策 → MCP 执行 → 数据更新
+框架代码来自 Apboa Next，版权归 StudiousTiger，协议为 MIT。官方主站是 [Gitee](https://gitee.com/studioustiger/apboa-next)，镜像在 [GitHub](https://github.com/huxuehao/apboa-next)。
 
-> 详细技术文档请参考：[Apboa Workflow 技术文章](ui/src/views/Workflow/apboa-workflow-技术文章.md)
-
-### ⏰ 自动化定时任务
-
-**为智能体和工作流设置定时执行计划，实现无人值守的自动化运营。**
-
-Apboa 自动化模块将定时调度与 AI 能力深度整合，让用户可以为任意智能体或工作流绑定 Cron 定时策略，实现周期性自动执行。无论是每日报表生成、定时数据同步，还是周期性内容推送，只需简单配置即可完成。
-
-**核心亮点：**
-
-| 特性 | 说明 |
-|------|------|
-| **双目标类型** | 支持智能体和工作流两种执行目标，统一管理入口 |
-| **Cron 可视化配置** | 内置 CronBuilder 组件，提供预设模板与无极调节，无需手写 cron 表达式 |
-| **手动触发** | 支持临时手动执行任务，验证配置或应急处理 |
-| **启用/禁用开关** | 一键控制任务启停，无需删除重建 |
-| **执行记录** | 完整记录每次执行结果：工作流展示节点级日志，智能体展示完整对话历史 |
-| **集群协调** | Redis 分布式锁 + 节点心跳机制，多节点部署时保证任务单次执行，负载均衡分配 |
-
-**典型应用场景：**
-
-- **智能日报**：每天 9:00，智能体自动拉取数据生成日报 → 推送到工作空间
-- **定时监控**：每 5 分钟，工作流查询数据库 → 条件判断 → 异常时发送消息
-- **周期性批量处理**：工作日每小时，智能体批量处理待办项 → 记录执行结果
-
-> 调度引擎基于 Quartz + Redis 分布式锁，后端由 [AgentScheduler](scheduler/src/main/java/com/hxh/apboa/scheduler/scheduler/AgentScheduler.java) 和 [WorkflowScheduler](scheduler/src/main/java/com/hxh/apboa/scheduler/scheduler/WorkflowScheduler.java) 实现。
-
-### 🌐 API 服务网关
-
-**将已发布的工作流一键暴露为标准 HTTP API，对外提供服务。**
-
-基于 Vert.x 异步非阻塞网关，用户可创建监听独立端口的网关应用，并将已发布的工作流注册为应用下的 HTTP API。请求参数自动转换为工作流输入，同步返回执行结果，配合统一鉴权与访问控制，快速完成 AI 能力的服务化输出。
-
-**核心亮点：**
-
-| 特性 | 说明 |
-|------|------|
-| **独立端口应用** | 一个应用对应一个监听端口，应用间完全隔离，支持 CORS 与请求体大小限制 |
-| **动态路由** | 应用与 API 上下线实时挂载/卸载路由，无需重启服务 |
-| **统一鉴权** | 复用平台凭证体系，携带平台登录 Token 或已注册 SK 即可调用 |
-| **IP 访问白名单** | 应用级白名单，基于 TCP 层真实来源判定防伪造，IPv4 / IPv6 归一化匹配，留空不限制 |
-| **限流控制** | API 级限流策略，超限请求快速失败 |
-| **访问日志** | 全链路访问日志异步落库，支持按应用 / API 检索 |
-| **多节点同步** | 配置变更经 Redis 广播至所有网关节点自动重新部署，集群状态一致 |
-
-> 数据面由 [GatewayLifecycleManager](gateway/src/main/java/com/hxh/apboa/gateway/core/GatewayLifecycleManager.java) 管理应用生命周期。
-
-### 📊 千人千面工作台
-
-**拖拽搭建专属数据看板，让每个人的首页都不一样。**
-
-Apboa 工作台是面向终端用户的可视化数据门户。通过拖拽面板、绑定数据集，用户几分钟即可搭出属于自己的数据看板——关心的指标、顺手的入口、实时的图表各就各位。设计器提供细粒度栅格、自动排版、历史版本与未保存离开拦截，兼具专业工具的手感与克制的视觉美学。
-
-**核心亮点：**
-
-| 特性 | 说明 |
-|------|------|
-| **20+ 面板类型** | 指标（数据卡片 / KPI 趋势 / 进度环 / 数字翻牌）、图表（柱状 / 折线 / 面积 / 散点 / 饼图 / 雷达）、表格（数据表格 / 滚动轮播表）、内容（文本 / Markdown / 图片 / 网页 / 时钟）、快捷方式 |
-| **双通道数据集** | SQL 数据集（参数化 + 缓存 + 限流）与 HTTP 数据集（GET + dataPath 映射 + 同源带 token），统一策略执行 |
-| **数据集归属与共享** | 数据集归创建人私有，可选租户内共享；非创建人仅可使用与运行预览，不可查看细节或改删 |
-| **租户隔离强制注入** | 平台自动为数据集 SQL 追加租户过滤，敏感系统表黑名单 + 可查询白名单 + 越权防护 + 审计日志 |
-| **面板私有筛选器** | 日期 / 月份 / 年份 / 下拉 / 文本，可拖拽排序、四角停靠，同一数据集各面板各看切面 |
-| **可视化设计器** | 48 列细粒度栅格、防碰撞开关、skyline 自动排版、撤销重做、历史版本回滚、未保存离开拦截 |
-| **动态占位与自定义组件** | 文本 / Markdown 支持 `{{ 字段 }}` 占位；portal 目录 Vue 组件自动扫描、props 自动识别，零胶水扩展 |
-| **样式覆盖与定时刷新** | 每面板可覆盖背景 / 边框 / 圆角 / 内边距 / 文字样式（含透明度）；定时静默刷新不闪屏 |
-
-**典型应用场景：**
-
-- **运营看板**：绑定 SQL 数据集 → 拖入指标卡与图表 → 私有筛选按日期/状态切片 → 定时刷新
-- **接口聚合**：HTTP 数据集对接内部服务 → dataPath 映射为表格 → 与本地数据同屏对比
-- **个性首页**：快捷方式导航 + 摸鱼进度条 + 每日一言等自定义组件，打造专属工作起点
-
-> 数据集执行经安全校验与租户改写后执行，详见 [DatasetExecutionService](biz/biz-dashboard/src/main/java/com/hxh/apboa/dashboard/dataset/DatasetExecutionService.java) 与 [TenantPredicateRewriter](biz/biz-dashboard/src/main/java/com/hxh/apboa/dashboard/dataset/guard/TenantPredicateRewriter.java)。
-
----
-
-## 系统架构
-
-5 服务解耦架构，Runtime 支持弹性扩容：
-
-<img src="image/image-20260617180312763.png" width="100%">
-
-- **Console** — 管理控制台、API 网关、心跳中心（单实例）
-- **Runtime** — AI 推理运行时、AG-UI 协议端点（弹性扩容）
-- **Proxy** — Shell 命令沙箱执行（随 Runtime 扩容）
-- **File** — 技能文件跨节点同步（随 Runtime 扩容）
-- **WebSocket** — 实时消息推送、Redis Pub/Sub 集群（单实例）
-
----
-
-## 为什么选择 Apboa
-
-### 🔗 A2A 跨智能体协作
-
-基于 WellKnown / Nacos 标准 A2A 协议，智能体间可互相发现和调用。支持 Agent-as-Tool 模式，父智能体将子智能体注册为工具，构建多智能体协作网络。
-
-### 📊 VEP + APIP 双协议
-
-**VEP**（Vision Enhancement Protocol）：AI 生成结构化数据卡片与 ECharts 图表（雷达图 / 折线图 / 柱状图 / 饼图），前端原生渲染。
-**APIP**（Agent-Platform Interaction Protocol）：AI 生成交互表单、选择器、确认组件，标准化人机交互协议。
-
-### 🔬 脚本安全扫描器
-
-`ScriptSecurityService` 注册机制驱动，已实现 Python / Node.js / Shell / HTML四种语言安全检查，覆盖注入攻击、数据泄露、权限提升等风险类别。
-
-### 🗄️ 五种向量存储，零代码切换
-
-PgVector / Milvus / Elasticsearch / Qdrant / Weaviate——修改 `VECTOR_STORE_TYPE` 环境变量即可切换，`VectorStore` 接口统一抽象。
-
-### 🚀 分布式架构与弹性扩容
-
-后台拆分为 5 个服务：1 个控制台与 3 个运行时（支持无限横向扩展）加 1 个消息服务协同工作，辅以优化后的 SKILL 同步机制与内置服务监控，实现企业级分布式部署与弹性扩容。同时提供更友好的前端多租户交互体验，满足企业级组织架构下的权限隔离需求。
-
-### ⚡ 多 Session 并行与状态持久化
-
-支持多 Session 并行运行，无需等待消息结束即可开启新对话。消息记录迁移至后端存储，运行中的 Session 状态自动保存，强制刷新页面后流式输出仍可继续。
-
-### 📄 文档识别与交互增强
-
-新增的文档识别能力与模型解耦，理论上可扩展支持任意类型的文档内容识别。交互式表单让对话不再局限于纯文本，视觉增强卡片与图表使信息呈现更加直观。
-
----
-
-## 能力清单
-
-- **ReAct 智能体** — Reasoning + Acting 循环，可配置最大迭代次数、计划规划、用户确认
-- **多模型支持** — OpenAI / DashScope / Anthropic / Gemini / Ollama / OrcaRouter，Agent 级参数覆盖
-- **MCP 集成** — HTTP / SSE / STDIO 三协议，懒加载 + 运行时降级 + 工具治理
-- **工具系统** — 内置工具 + Groovy 动态工具 + Agent-as-Tool + 工具确认机制
-- **技能包** — VEP / APIP 内置协议技能 + 用户自定义技能（26 种文件类型）
-- **知识库** — 百炼 / Dify / RagFlow / 本地 RAG，GENERIC + AGENTIC 双模式
-- **向量存储** — PgVector / Milvus / Elasticsearch / Qdrant / Weaviate
-- **短期记忆** — InMemory + AutoContext 自动压缩（可配置 tokenRatio / lastKeep）
-- **长期记忆** — Mem0 / ReMe / Bailian 三种后端，异步记录不阻塞主流程
-- **计划笔记本** — 任务分解、子任务管理、用户确认、状态持久化
-- **Hook 系统** — 内置 Hook + Groovy 动态 Hook，GLOBAL / TENANT 双作用域
-- **代码执行** — Shell 沙箱 + 文件读写 + Search/Replace 增量更新 + 工作空间容量管控
-- **A2A 协议** — WellKnown / Nacos 双模式，跨智能体发现与调用
-- **多租户** — 租户发现 / 申请 / 审批 / RBAC / 数据隔离
-- **会话归档** — 消息按月分表归档（`chat_message_yyyyMM`），主表保持轻量
-- **分布式锁** — Redis 分布式锁 + Pub/Sub，多实例定时任务不重复执行
-- **限流策略** — Nginx 三级限流：API 50r/s · 低频 20r/s · 并发连接 100/IP
-- **容器安全** — cap_drop + no-new-privileges + mem_limit + cpus + pids_limit
-- **健康监控** — 独立心跳上报 + 双注册表（执行节点 / WebSocket 节点），超时自动清理
-- **多 Session 并行** — 多会话并行运行，状态自动保存，刷新页面流式输出不中断
-- **文档识别** — 与模型解耦的文档解析能力，可扩展支持任意类型文档内容识别
-- **交互式表单（APIP）** — AI 生成交互组件，对话不再局限于纯文本
-- **视觉增强（VEP）** — 结构化数据卡片与 ECharts 图表，信息呈现更加直观
-- **可视化工作流（Workflow）** — 30+ 节点类型、拖拽编排、实时调试、模板引擎、子工作流、桥接解耦
-- **自动化定时任务（Automation）** — Cron 可视化配置、预设模板、启用/禁用开关、手动触发、执行记录追踪
-- **集群调度** — Quartz 调度引擎 + Redis 分布式锁 + 执行历史负载均衡 + 节点心跳存活检测
-- **API 服务网关（Gateway）** — 工作流一键暴露为 HTTP API，独立端口应用 + 动态路由 + 统一鉴权 + IP 白名单 + 访问日志（尝鲜）
-- **千人千面工作台（Dashboard）** — 拖拽式数据看板，20+ 面板 + SQL/HTTP 双通道数据集 + 数据集归属共享 + 租户隔离强制注入 + 自动排版 + 历史版本 + 自定义组件扩展
-
----
-
-## 技术栈
-
-- **后端** — Java 21 · Spring Boot 3.4.9 · AgentScope 1.0.12 · MyBatis-Plus 3.5.7
-- **前端** — Vue 3.5 · Ant Design Vue 4 · Vite 7 · Pinia 3 · Vue Router 5
-- **编辑器** — CodeMirror 6（JS / TS / Java / Python / HTML / CSS / JSON / XML / Markdown）
-- **可视化** — ECharts 6 · Mermaid 11 · Vue Flow · KaTeX
-- **工作流** — Vue Flow 画布引擎 · Groovy 表达式 · Velocity 模板 · 30+ 节点类型
-- **数据库** — MySQL 8.0 · Redis 7 · pgvector (PG 16)
-- **消息通信** — WebSocket + Redis Pub/Sub 集群
-- **任务调度** — Quartz + Redis 分布式锁
-- **部署方式** — Docker Compose · Nginx · Multi-stage Build
-
----
-
-## 核心页面预览
-
-| ![image-20260716222838455](image/image-20260716222838455.png) | ![image-20260716223019231](image/image-20260716223019231.png) |
-| ------------------------------------------------------------ | ------------------------------------------------------------ |
-|                                                              |                                                              |
-| ![工具配置](image/image-20260617181600141.png)               | ![image-20260716223114184](image/image-20260716223114184.png) |
-| ![image-20260716223152097](image/image-20260716223152097.png) | ![image-20260716223246390](image/image-20260716223246390.png) |
-| ![image-20260716223526060](image/image-20260716223526060.png) | ![image-20260716223602299](image/image-20260716223602299.png) |
-
-| ![智能体编排](image/image-20260617181923101.png) | ![image-20260716223329257](image/image-20260716223329257.png) | ![数据可视化](image/image-20260617182021804.png) |
-| ------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------ |
-
-| ![image-20260721194023660](image/image-20260721194023660.png) | ![image-20260721194031681](image/image-20260721194031681.png) |
-| ------------------------------------------------------------ | ------------------------------------------------------------ |
-| ![image-20260721194042584](image/image-20260721194042584.png) | ![image-20260721194052750](image/image-20260721194052750.png) |
-
-| ![image-20260710171008016](image/image-20260710171008016.png) | ![image-20260710171108812](image/image-20260710171108812.png) |
-| ---- | ---- |
-
----
-
-## 部署指南
-
-### 开发 / 评估
+本仓库的 `origin` 是 PatentKing。框架远程保留为 `upstream`：
 
 ```bash
-cd docker
-bash start-simple.sh        # 单机全量部署，约 5 分钟
+git pull upstream master
 ```
 
-### 生产环境
+## English
+
+### What this repository is
+
+PatentKing is a patent workbench for technology transfer. It covers six jobs:
+
+| Capability | What you get |
+|------------|----------------|
+| Disclosure drafting | An invention-point list, a disclosure, and a Word export |
+| Prior-art search | Retrieved references for a novelty read |
+| Paper to patent | An application draft prepared from a paper |
+| Office-action reply | An outline for an inventive-step response |
+| Infringement / FTO | A product-to-claim comparison for a publication number |
+| Matter management | Versions, sessions, and artifacts kept by matter type |
+
+Matters live under **成果转化 → 案件** in the sidebar, at `/web/#/patent-matters`. The design notes are in [docs/architecture/adr-001-matter-and-tools.md](docs/architecture/adr-001-matter-and-tools.md).
+
+### Before you start
+
+You need Docker Engine 20+ and Docker Compose v2. The host does not need JDK, Maven, or Node. The first build compiles them inside the images.
+
+The single-node stack runs MySQL, Redis, pgvector, the console, the runtime, the gateway, WebSocket, the shell proxy, the frontend, and the patent tools. In `docker/.env.simple`, the runtime and the gateway are each capped at 4 GB. Give Docker enough memory to honor those caps. If the machine is tight, lower `*_MEM_LIMIT` in that file first.
+
+### Start
 
 ```bash
-cd docker
-bash start-middleware.sh    # 中间件服务（Mysql、Redis、向量库）
-bash start-console.sh       # 仅管理控制台
-bash start-execute.sh       # 分布式部署，Runtime 可独立扩容
+git clone https://github.com/zhaopeinan/PatentKing.git
+cd PatentKing
+bash scripts/pk-dev.sh build
 ```
 
-> [!NOTE]
-> 生产部署建议：Runtime 至少 2 实例，MySQL 、 Redis 与 向量库 使用托管服务。
+The script checks that Docker is up, copies `docker/.env.simple` to `docker/.env`, and runs `docker compose up -d --build`. The containers are:
 
----
+| Container | Role | Host port |
+|-----------|------|-----------|
+| `apboa-mysql` | Primary database `apboa_next` | 3306 |
+| `apboa-redis` | Cache and locks | 6379 |
+| `apboa-pgvector` | Vector store | 5432 |
+| `apboa-console` | Admin API, including skill import | 3060 |
+| `apboa-runtime` | Agent runtime | 3061 inside the network |
+| `apboa-gateway` | Workflow ports, on the host network | bound on the host |
+| `apboa-proxy` | Shell execution proxy | 3062 |
+| `apboa-websocket` | Push channel | 3064 |
+| `patentking-patent-tools` | Search, figures, and Word export | 3070 |
+| `apboa-frontend` | Nginx | 80 |
 
-## 项目结构
-
-```
-apboa-next/
-├── common-base/          # 基础层：枚举、常量、工具类、加密
-├── common/               # 公共层：Entity、DTO、VO、Wrapper
-├── biz/                  # 业务层（22 个扁平化模块）
-│   ├── biz-agent/        #   智能体定义 + 会话管理
-│   ├── biz-account/      #   账号 + 租户 + 审批
-│   ├── biz-mcp/          #   MCP 服务管理 + 运行时降级
-│   ├── biz-knowledge/    #   知识库配置
-│   ├── biz-skill/        #   技能包管理
-│   ├── biz-tool/         #   工具配置
-│   ├── biz-hook/         #   Hook 配置
-│   ├── biz-model/        #   模型供应商 + 模型配置
-│   ├── biz-prompt/       #   系统提示词模板
-│   ├── biz-sensitive/    #   敏感词管理
-│   ├── biz-resource/     #   附件 + 存储协议
-│   ├── biz-params/       #   系统参数
-│   ├── biz-a2a/          #   A2A 协议配置
-│   ├── biz-studio/       #   Studio 集成
-│   ├── biz-sk/           #   密钥管理
-│   ├── biz-workflow/     #   工作流定义 + 运行记录 + 资源绑定
-│   ├── biz-datasource/   #   数据源配置（工作流 DB 节点）
-│   ├── biz-cache/        #   缓存配置（工作流缓存节点）
-│   ├── biz-mq/           #   消息队列配置（工作流 MQ 节点）
-│   ├── biz-channel/      #   消息渠道配置（工作流渠道节点）
-│   ├── biz-gateway/      #   网关应用 + API 定义 + 访问日志
-│   └── biz-longterm/     #   长期记忆配置
-├── engine/               # 引擎层
-│   ├── agent/            #   ReAct / A2A 智能体工厂
-│   ├── agui/             #   AG-UI 协议智能体装配与注册
-│   ├── model/            #   多模型供应商适配
-│   ├── formatter/        #   模型消息格式化器
-│   ├── tool/             #   工具系统 + 动态加载
-│   ├── skill/            #   VEP / APIP 内置技能
-│   ├── knowledge/        #   多后端知识库工厂
-│   ├── mcp/              #   MCP 客户端工厂 + 懒加载
-│   ├── memory/           #   记忆管理 + 长期记忆
-│   ├── rag/              #   本地 RAG 流水线
-│   ├── hook/             #   Hook 生命周期
-│   ├── prompt/           #   提示词工程
-│   ├── security/         #   脚本安全扫描引擎
-│   ├── workspace/        #   工作空间 + 安全校验
-│   ├── log/              #   对话日志异步生产消费
-│   ├── studio/           #   Studio 运行时集成
-│   ├── controller/       #   引擎内置接口（文件访问）
-│   └── mpatch/           #   代码增量更新器
-├── workflow/             # 工作流引擎层
-│   ├── node/             #   30+ 节点实现（base/cache/code/condition/db/http/loop/mcp/mq/...）
-│   └── workflow/         #   工作流核心（Workflow/Edge/RunWorkflow）
-├── gateway/              # API 服务网关数据面（Vert.x 动态路由 + 鉴权 + 白名单 + 限流）
-├── scheduler/            # 调度层：Quartz + 分布式锁
-├── heartbeat/            # 基础设施：心跳监控
-├── runner-console/       # 应用：管理控制台（36 个 Controller）
-├── runner-runtime/       # 应用：AI 运行时 + AG-UI 端点
-├── runner-proxy/         # 应用：Shell 沙箱
-├── runner-file/          # 应用：文件同步
-├── runner-websocket/     # 应用：WebSocket 推送
-├── ui/                   # 前端：Vue 3 管理界面
-├── docker/               # 部署：Docker Compose + Nginx
-└── sql/                  # 数据库初始化脚本
-```
-
----
-
-## 贡献指南
-
-我们欢迎任何形式的贡献！请按照以下流程提交 Pull Request：
-
-### 1. Fork 与克隆
-
-在 Gitee 上 Fork 本仓库，然后克隆到本地：
+The first build pulls base images and compiles Java and the frontend inside those images. Later starts are much shorter. Watch it with:
 
 ```bash
-git clone https://gitee.com/<your-username>/apboa-next.git
-cd apboa-next
-git remote add upstream https://gitee.com/studious_tiger/apboa-next.git
+bash scripts/pk-dev.sh status
 ```
 
-### 2. 创建分支
+Open <http://localhost>. Nginx redirects `/` to `/web/`.
 
-从 `main` 分支创建你的工作分支，分支命名遵循以下规范：
+The local bootstrap account is `admin` / `Admin@123.com`. It ships with the upstream single-node image for local use. Change it before the service is reachable beyond your machine.
 
-| 类型 | 分支前缀 | 示例 |
-|------|----------|------|
-| 新功能 | `feature/` | `feature/mcp-timeout-retry` |
-| 缺陷修复 | `fix/` | `fix/react-loop-null-check` |
-| 文档更新 | `docs/` | `docs/update-deploy-guide` |
-| 重构优化 | `refactor/` | `refactor/vector-store-factory` |
+Data is stored in `docker/data/`, which is not committed. Stop and tear down with:
 
 ```bash
-git checkout -b feature/your-feature-name
+bash scripts/pk-dev.sh stop   # stop containers, keep data
+bash scripts/pk-dev.sh down   # remove containers and the network, keep docker/data
 ```
 
-### 3. 开发与提交
+To move the site off port 80, set `FRONTEND_PORT` in `docker/.env.simple` and run `build` again. The helper overwrites `docker/.env` from `.env.simple` on each start.
 
-**代码规范：**
+### After you sign in
 
-- 后端代码遵循项目已有的注释规范（参见类/方法上的 Javadoc）
-- 前端代码遵循 ESLint + Prettier 配置
-- 新增功能应附带相应的单元测试
-- 确保本地 `mvn compile` 和前端 `pnpm build` 通过
+This repository does not ship a commercial model key. Configure a model before you import skills. The import binds the default agents to the first enabled model in the tenant, so the order matters.
 
-**Commit Message 规范：**
+1. Open **开发 → 模型供应商** and enter the base URL and API key. The key is stored in the tenant secret store. Do not commit it.
+2. Open **模型配置**, enable a concrete model, and confirm it connects.
+3. Clone the patent skills. Those five repositories carry patent texts and evaluation sets, so they are not vendored here. `PatentRadar` is the large one.
 
-采用 [Conventional Commits](https://www.conventionalcommits.org/) 格式：
-
-```
-<type>(<scope>): <subject>
-
-[可选的正文]
-
-[可选的脚注]
-```
-
-常用 `type`：
-
-- `feat` — 新功能
-- `fix` — 缺陷修复
-- `docs` — 文档变更
-- `refactor` — 重构（非新功能、非修复）
-- `perf` — 性能优化
-- `test` — 测试相关
-- `chore` — 构建/工具链变更
-
-`scope` 为可选的模块名，如 `engine`、`mcp`、`ui`、`docker` 等。
-
-示例：
-
-```
-feat(mcp): 添加 MCP 连接超时自动重试机制
-
-- 连续失败 3 次后自动降级
-- 支持通过配置调整重试阈值
+```bash
+mkdir -p patent-skills
+cd patent-skills
+git clone https://github.com/handsomestWei/patent-disclosure-skill.git handsomestWei-patent-disclosure-skill
+git clone https://github.com/AqooDer/patent-mining-disclosure-skill.git patent-mining-disclosure-skill
+git clone https://github.com/fuyuxiang/patent-disclosure-skill.git fuyuxiang-patent-disclosure-skill
+git clone https://github.com/7toCR/paper2patent.git paper2patent
+git clone https://github.com/yuc16/PatentRadar.git PatentRadar
+cd ..
+bash scripts/pack-skills.sh
+bash scripts/pk-import-skills.sh
 ```
 
-### 4. 提交 Pull Request
+`pk-import-skills.sh` signs in to `http://127.0.0.1:3060`, uploads the skill bundle, and creates four agents: disclosure, paper-to-patent, infringement comparison, and conversational disclosure. Override the account if you have changed it:
 
-- 确保你的分支与上游 `main` 保持同步：
+```bash
+PK_USER=admin PK_PASS='your-password' bash scripts/pk-import-skills.sh
+```
 
-  ```bash
-  git fetch upstream
-  git rebase upstream/main
-  ```
+4. Open **成果转化 → 案件**, create a matter, and start the session from that matter.
+5. Disclosure figures can be rendered locally with mermaid. For Tokenlab image generation, open **系统设置 → PatentKing 生图** and save the API key. The key stays in server-side settings.
 
-- 推送分支到你的 Fork 仓库后，向本仓库的 `main` 分支发起 Pull Request
-- PR 标题遵循 Commit Message 格式，简要描述变更内容
-- PR 描述中请说明：**变更动机**、**变更内容**、**测试方式**
-- 一个 PR 只做一件事，避免混合多个不相关的变更
-- 如果 PR 关联某个 Issue，请在描述中引用
+Check the patent tools:
 
-### 5. 代码审查
+```bash
+curl -s http://127.0.0.1:3070/healthz
+```
 
-- PR 提交后将由维护者进行 Code Review
-- 请根据审查意见及时修改并推送更新
-- 审查通过后由维护者合并到 `main` 分支
+A successful response means the sidecar is listening. If the browser login works and the matter page opens, the single-node install is up.
 
-> **提示：** 提交前请确保已签署 [贡献者许可协议（CLA）](https://cla-assistant.io/)（如适用），并同意你的贡献遵循本项目的 [MIT](LICENSE) 开源协议。
+### When image pulls stall
 
----
+Pulls from Docker Hub often time out on networks in mainland China. On OrbStack:
 
-## 交流与赞助
+```bash
+bash scripts/pk-dev.sh mirror --pull
+bash scripts/pk-dev.sh build
+```
 
-<table>
-  <tr>
-    <td align="center"><strong>入群交流（备注 apboa）</strong></td>
-    <td align="center"><strong>微信赞助</strong></td>
-    <td align="center"><strong>支付宝赞助</strong></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="image/image-20260617193446946.png" width="200" alt="入群二维码"/></td>
-    <td align="center"><img src="image/image-20260617193023284.png" width="200" alt="微信收款码"/></td>
-    <td align="center"><img src="image/image-20260617184137320.png" width="200" alt="支付宝收款码"/></td>
-  </tr>
-</table>
+Elsewhere, set `registry-mirrors` on the Docker daemon, or set `DOCKER_REGISTRY` in `docker/.env.simple`. See [docs/dev-environment.md](docs/dev-environment.md).
 
----
+### Hacking on the UI or the Java services
 
-## 开源协议
+Day-to-day use does not require splitting the stack. When you do change the UI or the backend, keep the middleware in Docker and run the app on the host. Ports, sample configs, and the order of processes are in [docs/dev-environment.md](docs/dev-environment.md). The upstream framework write-up is archived in [docs/apboa-framework.md](docs/apboa-framework.md). Multi-node deployment is in [docker/README.md](docker/README.md).
 
-[MIT](LICENSE) — Copyright (c) 2026 StudiousTiger
+### Left out on purpose
 
----
+- Model API keys and the Tokenlab key.
+- Disclosure samples under `ground_truth_file/`, and paper PDFs under `test/`. The notes remain; bring your own files.
+- `docker/data/`, `docker/logs/`, and `docker/.env`.
+- Third-party skill checkouts and the patent evaluation data inside them.
 
-<p align="center">
-  <sub>如果觉得 Apboa 对你有帮助，请给一颗 Star 支持。</sub>
-</p>
+### Layout
 
----
+| Path | Contents |
+|------|----------|
+| `biz/biz-pk-matter` | Matters, export, prior-art search, and bootstrap |
+| `docker/` | The single-node stack and the `patent-tools` image |
+| `ui/src/views/PatentKing` | The matter UI |
+| `patent-skills/tokenlab-imagegen` | The figure-generation skill shipped here |
+| `scripts/pk-dev.sh` | Start, stop, patent tools, and registry mirrors |
+| `docs/` | Environment notes, the architecture decision, and the upstream guide |
 
-无论是构建客服助手、创意伙伴还是行业专家，您都无需从零开始。在 Apboa Next 的赋能下，只需通过简单的配置与拖拽，即可将前沿的 AI 能力快速转化为解决实际业务问题的智能体，大幅降低技术门槛与开发周期，真正实现智能应用的随需而创、高效落地。
+### Upstream
+
+The framework is Apboa Next, copyright StudiousTiger, MIT licensed. Upstream publishes on [Gitee](https://gitee.com/studioustiger/apboa-next) and mirrors to [GitHub](https://github.com/huxuehao/apboa-next).
+
+`origin` on this clone is PatentKing. The framework remote is kept as `upstream`:
+
+```bash
+git pull upstream master
+```
+
+## License
+
+[MIT](LICENSE). The Apboa Next portions remain copyright StudiousTiger. See the notice in `LICENSE`.
