@@ -1,10 +1,8 @@
-# PatentKing
-
 <p align="center">
-  <strong>专利王</strong><br/>
-  面向成果转化的专利智能体<br/>
-  A patent agent for technology transfer
+  <img src="docs/assets/patentking-banner.png" alt="PatentKing 专利王。面向成果转化的专利智能体。A patent agent for technology transfer." width="100%">
 </p>
+
+# PatentKing
 
 <p align="center">
   <a href="#中文">中文</a> · <a href="#english">English</a>
