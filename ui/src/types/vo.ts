@@ -611,6 +611,54 @@ export interface ServiceStatusInfo {
   startedAt: string
 }
 
+export interface PkMatterVO {
+  id: string
+  title: string
+  matterType: string
+  status: string
+  agentDefinitionId?: string
+  workspaceRelPath?: string
+  inventorsJson?: string
+  metaJson?: string
+  remark?: string
+  enabled?: boolean
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface PkPatentPointsState {
+  inventory: import('./dto').PkPatentPointItem[]
+  selectedIds: string[]
+  tradeSecretIds: string[]
+  deferredIds: string[]
+  notes?: string
+  submittedAt?: string
+  confirmedAt?: string
+  gate?: string
+}
+
+export interface PkMatterVersionVO {
+  id: string
+  matterId: string
+  versionNo: number
+  label?: string
+  pathRel?: string
+  note?: string
+  createdAt?: string
+}
+
+export interface PkArtifactVO {
+  id: string
+  matterId: string
+  versionId?: string
+  artifactType: string
+  name: string
+  storageUri?: string
+  mime?: string
+  metaJson?: string
+  createdAt?: string
+}
+
 /** 执行节点状态 VO */
 export interface NodeStatusVO {
   nodeId: string

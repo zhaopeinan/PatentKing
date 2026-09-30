@@ -356,3 +356,55 @@ export interface ChatSessionQueryDTO {
   page?: number
   size?: number
 }
+
+export interface PkMatterDTO extends PageParams {
+  title?: string
+  matterType?: string
+  status?: string
+}
+
+export interface PkPatentPointItem {
+  id: string
+  title: string
+  bucket?: 'file' | 'secret' | 'defer' | string
+  summary?: string
+  priorArtNote?: string
+}
+
+export interface PkPatentPointsDTO {
+  inventory?: PkPatentPointItem[]
+  selectedIds?: string[]
+  tradeSecretIds?: string[]
+  deferredIds?: string[]
+  notes?: string
+}
+
+export interface PkDeliveryDTO {
+  previewAction?: string
+  adjustNotes?: string
+  deliveryFormat?: string
+  diagramMode?: string
+  includePdf?: boolean
+}
+
+export interface PkTokenlabSettingsDTO {
+  apiKey?: string
+  baseUrl?: string
+  fallbackBaseUrl?: string
+  model?: string
+  size?: string
+  quality?: string
+  network?: string
+  proxy?: string
+}
+
+export interface PkTokenlabSettingsVO {
+  apiKeyConfigured?: boolean
+  baseUrl?: string
+  fallbackBaseUrl?: string
+  model?: string
+  size?: string
+  quality?: string
+  network?: string
+  proxy?: string
+}

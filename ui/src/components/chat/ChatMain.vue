@@ -49,6 +49,8 @@ const props = defineProps<{
   currentPlan?: PlanInfo | null
   contextUsage?: ContextUsageEvent['value'] | null
   memoryCompressionActive?: boolean
+  matterId?: string
+  diagramPreviewMode?: string
 }>()
 
 const emit = defineEmits<{
@@ -71,6 +73,9 @@ const emit = defineEmits<{
   (e: 'interactionSubmit', payload: InteractionSubmitPayload): void
   (e: 'uipRetry', uipCode: string): void
   (e: 'vepRetry', vepCode: string): void
+  (e: 'mermaidRetry', payload: import('@/utils/chat/mermaid').MermaidRetryPayload): void
+  (e: 'toolAbort'): void
+  (e: 'toolDirectExport', value: { name: string; args?: string }): void
 }>()
 
 // 滚动容器 ref
@@ -317,11 +322,16 @@ defineExpose({
             :agent-has-result="agentHasResult"
             :messages="messages"
             :tool-calls="toolCalls"
+            :matter-id="matterId"
+            :diagram-preview-mode="diagramPreviewMode"
             @inputTagPreview="inputTagPreviewHandle"
             @toolContent="(content: any) => $emit('toolContent', content)"
             @interaction-submit="$emit('interactionSubmit', $event)"
-            @uip-retry="$emit('uipRetry', $event)"
-            @vep-retry="$emit('vepRetry', $event)"
+        @uip-retry="$emit('uipRetry', $event)"
+        @vep-retry="$emit('vepRetry', $event)"
+        @mermaid-retry="$emit('mermaidRetry', $event)"
+            @tool-abort="$emit('toolAbort')"
+            @tool-direct-export="$emit('toolDirectExport', $event)"
           />
         </div>
         <MessageNavigator

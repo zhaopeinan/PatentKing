@@ -16,6 +16,7 @@ defineEmits<{
   (e: 'interactionSubmit', payload: InteractionSubmitPayload): void
   (e: 'uipRetry', uipCode: string): void
   (e: 'vepRetry', vepCode: string): void
+  (e: 'mermaidRetry', payload: import('@/utils/chat/mermaid').MermaidRetryPayload): void
 }>()
 
 type TimelineItem =
@@ -187,6 +188,9 @@ onBeforeUnmount(() => {
           :is-streaming="active && !item.completed"
           :readonly-interaction="true"
           @inputTagPreview="$emit('inputTagPreview', $event)"
+          @uip-retry="$emit('uipRetry', $event)"
+          @vep-retry="$emit('vepRetry', $event)"
+          @mermaid-retry="$emit('mermaidRetry', $event)"
         />
       </template>
       <template v-else-if="item.kind === 'tool'">

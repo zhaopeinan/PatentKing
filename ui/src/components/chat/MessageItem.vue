@@ -7,6 +7,8 @@ import MediaIcon from '@/components/common/MediaIcon.vue'
 import MarkdownRenderer from "@/components/markdown/MarkdownRenderer.vue";
 import TaggedContentRenderer from './TaggedContentRenderer.vue';
 import type { InteractionSubmitPayload } from '@/components/markdown/uip/types'
+import { formatToolResult, getToolDisplayMeta, summarizeToolArgs } from '@/utils/chat/toolDisplay'
+import type { MermaidRetryPayload } from '@/utils/chat/mermaid'
 
 const FILE_SEP = '@==##::::##==@'
 
@@ -82,6 +84,7 @@ const props = defineProps<{
   isStreaming?: boolean
   isMemoryCompression?: boolean
   readonlyInteraction?: boolean
+  diagramPreviewMode?: string
 }>()
 
 defineEmits<{
@@ -89,6 +92,7 @@ defineEmits<{
   interactionSubmit: [payload: InteractionSubmitPayload]
   uipRetry: [uipCode: string]
   vepRetry: [vepCode: string]
+  mermaidRetry: [payload: MermaidRetryPayload]
 }>()
 
 const isUser = computed(() => props.role === 'user')
@@ -124,7 +128,7 @@ interface ToolCallItem {
 }
 
 /** 解析工具调用 JSON 内容 */
-const parsedToolCall = computed<ToolCallItem>(() => {
+const parsedToolCall = computed<ToolCallItem | null>(() => {
   if (!props.content) return null
   try {
     return JSON.parse(props.content)
@@ -132,6 +136,19 @@ const parsedToolCall = computed<ToolCallItem>(() => {
     return null
   }
 })
+
+const toolDisplayLabel = computed(() => {
+  if (!parsedToolCall.value?.name) return '工具调用'
+  return getToolDisplayMeta(parsedToolCall.value.name).label
+})
+
+const toolArgsSummary = computed(() =>
+  parsedToolCall.value ? summarizeToolArgs(parsedToolCall.value.name, parsedToolCall.value.args) : ''
+)
+
+const toolResultSummary = computed(() =>
+  parsedToolCall.value ? formatToolResult(parsedToolCall.value.name, parsedToolCall.value.result) : ''
+)
 
 // 复制成功状态（2秒内）
 const copied = ref(false)
@@ -263,9 +280,11 @@ const openPreview = (index: number) => {
             :is-streaming="isStreaming"
             :disabled="currentIndex !== totalMessages - 1 || readonlyInteraction"
             :readonly-interaction="readonlyInteraction"
+            :diagram-mode="diagramPreviewMode"
             @interaction-submit="$emit('interactionSubmit', $event)"
             @uip-retry="$emit('uipRetry', $event)"
-            @vep-retry="$emit('vepRetry', $event)" />
+            @vep-retry="$emit('vepRetry', $event)"
+            @mermaid-retry="$emit('mermaidRetry', $event)" />
           <!-- 复制按钮：悬浮显现于正文下方 -->
           <span
             v-if="content"
@@ -287,7 +306,7 @@ const openPreview = (index: number) => {
           <div class="chat-tool-header" @click="toolExpanded = !toolExpanded">
             <span class="chat-tool-header-icon"><ToolOutlined /></span>
             <span class="chat-tool-header-title">
-              工具调用
+              {{ toolDisplayLabel }}
             </span>
             <span class="chat-tool-header-arrow">
               <DownOutlined v-if="toolExpanded" />
@@ -303,11 +322,11 @@ const openPreview = (index: number) => {
                 <span class="chat-tool-item-name">{{ parsedToolCall.name }}</span>
                 <span class="chat-tool-item-time">{{ parsedToolCall.totalTimes }}ms</span>
               </div>
-              <div v-if="parsedToolCall.args && parsedToolCall.args !== '{}'">
-                <pre class="chat-tool-item-code">{{ parsedToolCall.args }}</pre>
+              <div v-if="toolArgsSummary">
+                <pre class="chat-tool-item-code">{{ toolArgsSummary }}</pre>
               </div>
-              <div v-if="parsedToolCall.result">
-                <pre class="chat-tool-item-code">{{ parsedToolCall.result }}</pre>
+              <div v-if="toolResultSummary">
+                <pre class="chat-tool-item-code">{{ toolResultSummary }}</pre>
               </div>
             </template>
             <!-- JSON 解析失败：降级为原始文本 -->

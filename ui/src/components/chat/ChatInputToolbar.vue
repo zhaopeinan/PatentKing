@@ -158,7 +158,7 @@ const uploadTooltip = computed(() => {
       <ATooltip placement="bottom">
         <template #title>
           <span v-if="isStopping">正在中断中，请稍候</span>
-          <span v-else-if="isRunning">正在运行中</span>
+          <span v-else-if="isRunning">点击停止（终止当前工具/回复）</span>
           <span v-else-if="canSend">点击发送消息</span>
           <span v-else>输入内容后可发送</span>
         </template>

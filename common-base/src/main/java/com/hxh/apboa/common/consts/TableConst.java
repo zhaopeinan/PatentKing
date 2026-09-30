@@ -76,4 +76,7 @@ public class TableConst {
     public static final String DASHBOARD_USER = "dashboard_user";
     public static final String DASHBOARD_DATASET = "dashboard_dataset";
     public static final String DASHBOARD_HISTORY = "dashboard_history";
+    public static final String PK_MATTER = "pk_matter";
+    public static final String PK_MATTER_VERSION = "pk_matter_version";
+    public static final String PK_ARTIFACT = "pk_artifact";
 }

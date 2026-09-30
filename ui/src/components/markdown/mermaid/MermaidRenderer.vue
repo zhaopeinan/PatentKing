@@ -2,20 +2,30 @@
   <!-- 流式未完成 → 骨架屏 -->
   <MermaidSkeleton v-if="isStreaming" />
   <!-- 流式完成 → 图表 -->
-  <MermaidGraph v-else :code="code" />
+  <MermaidGraph
+    v-else
+    :code="code"
+    :disabled="disabled"
+    :diagram-mode="diagramMode"
+    @retry="emit('retry', $event)"
+  />
 </template>
 
 <script setup lang="ts">
 import MermaidSkeleton from '@/components/markdown/mermaid/MermaidSkeleton.vue'
 import MermaidGraph from '@/components/markdown/mermaid/MermaidGraph.vue'
-// ---------- Props ----------
+import type { MermaidRetryPayload } from '@/utils/chat/mermaid'
+
 defineProps<{
-  /** Mermaid 代码块原始内容 */
   code: string
-  /** 是否处于流式输出阶段 */
   isStreaming?: boolean
+  disabled?: boolean
+  diagramMode?: string
 }>()
 
+const emit = defineEmits<{
+  retry: [payload: MermaidRetryPayload]
+}>()
 </script>
 
 <style scoped>

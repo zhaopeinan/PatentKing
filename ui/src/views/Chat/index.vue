@@ -14,6 +14,7 @@ import RenameModal from '@/components/chat/RenameModal.vue'
 import WorkspacePanel from '@/components/workspace/WorkspacePanel.vue'
 import type { DisplayMessage, ChatMessageVO, UploadedFileItem, ChatSessionVO } from '@/types'
 import * as chatSessionApi from '@/api/chatSession'
+import * as pkMatterApi from '@/api/pkMatter'
 import { getActiveRuns, getStatus, getPending } from '@/api/agui'
 import { LoadingOutlined } from '@ant-design/icons-vue'
 import {
@@ -21,6 +22,16 @@ import {
   injectSubmissionToRawContent
 } from '@/utils/chat/uip.ts'
 import type { InteractionSubmitPayload } from '@/components/markdown/uip/types'
+import { dtoFromToolArgs, dtoFromUipForm } from '@/utils/pkPatentPoints'
+import {
+  buildDeliveryAgentMessage,
+  defaultDiagramMode,
+  dtoFromUipForm as dtoDeliveryFromUip,
+  PK_DELIVERY_UIP_ID,
+} from '@/utils/pkDelivery'
+import { buildMermaidRetryUserMessage, type MermaidRetryPayload } from '@/utils/chat/mermaid'
+import { parsePkExportToolArgs } from '@/utils/chat/pkExport'
+import { inferSceneFromMatter } from '@/utils/pkMatterTypes'
 
 const props = withDefaults(defineProps<{
   showAccount: boolean
@@ -36,6 +47,45 @@ const chatStore = useChatStore()
 const userInfo = computed(() => accountStore.userInfo)
 
 const agentId = computed(() => (props.chatAgentId || route.params.agentId) as string || '')
+
+const matterId = computed(() => {
+  const q = route.query.matterId
+  if (typeof q === 'string') return q
+  if (Array.isArray(q) && q[0]) return String(q[0])
+  return ''
+})
+const matterDiagramMode = ref('png')
+const matterScene = ref('')
+const matterTypeCode = ref('')
+
+async function refreshMatterDiagramMode() {
+  if (!matterId.value) {
+    matterDiagramMode.value = 'png'
+    matterScene.value = ''
+    matterTypeCode.value = ''
+    return
+  }
+  try {
+    const res = await pkMatterApi.detail(matterId.value)
+    const m = res.data.data
+    matterDiagramMode.value = defaultDiagramMode(m?.metaJson)
+    matterTypeCode.value = m?.matterType || ''
+    matterScene.value = inferSceneFromMatter(m?.matterType, m?.metaJson)
+  } catch {
+    matterDiagramMode.value = 'png'
+  }
+}
+
+const extraForwarded = computed<Record<string, unknown>>(() => {
+  if (!matterId.value) return {}
+  return {
+    params: {
+      matterId: matterId.value,
+      matterType: matterTypeCode.value || undefined,
+      scene: matterScene.value || undefined,
+    },
+  }
+})
 
 // 智能体详情
 const { agentDetail, allowFileType } = useAgentDetail(agentId)
@@ -156,7 +206,12 @@ const {
   toolProcessActive,
   (chatMsg: ChatMessageVO) => {
     messagesList.value.push(chatMsg)
-  })
+  },
+  extraForwarded,
+  (tool) => {
+    void registerExportFromToolResult(tool.name, tool.result)
+  },
+)
 
 // 输入框内容
 const inputText = ref('')
@@ -407,6 +462,21 @@ const submitRename = async () => {
 
 // HITL：value = { toolUseId, name, approved }，记录该工具决策（全部决策完内部自动调 resume 续跑）
 const handelToolContent = (value: any) => {
+  if (value?.approved && value?.name === 'pk_confirm_patent_points' && matterId.value) {
+    const tool = toolCallsInProgress.value.find(t => t.id === value.toolUseId)
+    let args: Record<string, unknown> = {}
+    try {
+      args = tool?.args ? JSON.parse(tool.args) as Record<string, unknown> : {}
+    } catch {
+      args = {}
+    }
+    pkMatterApi.confirmPatentPoints(matterId.value, dtoFromToolArgs(args))
+      .catch(err => console.warn('[PK] 同步专利点确认失败', err))
+    if (currentSessionId.value) {
+      pkMatterApi.importSession(matterId.value, currentSessionId.value)
+        .catch(err => console.warn('[PK] 导入对话记录失败', err))
+    }
+  }
   decideConfirm(value.toolUseId, value.approved)
 }
 
@@ -445,7 +515,20 @@ const handleInteractionSubmit = async (payload: InteractionSubmitPayload) => {
   // }
 
   // 3. 发送给 Agent 继续对话
-  const userText = buildUserTextFromPayload(payload)
+  let userText = buildUserTextFromPayload(payload)
+  if (payload.interactionId === PK_DELIVERY_UIP_ID) {
+    userText = buildDeliveryAgentMessage(data)
+  }
+  if (matterId.value && payload.interactionId === 'pk_patent_points') {
+    pkMatterApi.submitPatentPoints(matterId.value, dtoFromUipForm(data, payload.uipCode))
+      .catch(err => console.warn('[PK] 同步专利点表单失败', err))
+  }
+  if (matterId.value && payload.interactionId === PK_DELIVERY_UIP_ID) {
+    const deliveryDto = dtoDeliveryFromUip(data)
+    matterDiagramMode.value = deliveryDto.diagramMode || 'png'
+    pkMatterApi.submitDelivery(matterId.value, deliveryDto)
+      .catch(err => console.warn('[PK] 同步交付格式失败', err))
+  }
   await sendMessage(userText, [{ id: 'uip', role: 'user', content: userText }] as ChatMessageVO[])
 }
 
@@ -463,10 +546,52 @@ const handleUIPRetry = async (uipCode: string) => {
 const handleVEPRetry = async (vepCode: string) => {
   if (!currentSessionId.value || isRunning.value || isStopping.value) return
 
-  // 构造重试消息：提示文本 + 原始 VEP 内容，让智能体参考修正
   const retryText = `上一条消息中的视觉卡片生成有误，请重新生成。\n\n原始卡片内容：\n${vepCode}`
 
   await sendMessage(retryText, [{ id: 'vep', role: 'user', content: retryText }] as ChatMessageVO[])
+}
+
+const handleMermaidRetry = async (payload: MermaidRetryPayload) => {
+  if (!currentSessionId.value) {
+    message.warning('当前无会话，无法请求修复')
+    return
+  }
+  if (isRunning.value || isStopping.value) {
+    message.warning('请等待当前回复结束后再重试')
+    return
+  }
+
+  const retryText = buildMermaidRetryUserMessage(payload)
+  message.info('已发送 Mermaid 修复请求，请等待助手回复')
+  await sendMessage(retryText, [{ id: 'mermaid', role: 'user', content: retryText }] as ChatMessageVO[])
+}
+
+const handleToolAbort = () => {
+  void abortRun()
+}
+
+async function handleToolDirectExport(payload: { name: string; args?: string }) {
+  if (!matterId.value || payload.name !== 'pk_export_disclosure') return
+  const parsed = parsePkExportToolArgs(payload.args)
+  if (!parsed) {
+    message.warning('导出参数尚未就绪，请稍候几秒或终止后在案件页重试')
+    return
+  }
+  try {
+    message.loading({ content: '正在后台渲染 Word…', key: 'pk-direct-export', duration: 0 })
+    await pkMatterApi.exportDocx(matterId.value, {
+      markdown: parsed.markdown,
+      title: parsed.title,
+      diagramMode: parsed.diagramMode || matterDiagramMode.value,
+    })
+    message.success({ content: 'Word 已生成，可在案件页下载', key: 'pk-direct-export' })
+  } catch (err) {
+    console.warn('[PK] 直接导出失败', err)
+    message.error({
+      content: '直接导出失败。请确认 patent-tools 容器在运行，或到案件页点击「导出 Word」',
+      key: 'pk-direct-export',
+    })
+  }
 }
 
 // 发送消息
@@ -483,10 +608,14 @@ const handleSend = async () => {
   inputText.value = ''
   uploadedFiles.value = []
 
+  const titleSource =
+    text
+    || (hasFiles ? filesToSend.map(f => f.name || '').filter(Boolean).join('、') : '')
+    || '新对话'
+
   // 如果没有当前会话，先创建
   if (!currentSessionId.value) {
-    const titleInput = text || '新对话'
-    const newSession = await createSession(formatSessionTitle(titleInput))
+    const newSession = await createSession(formatSessionTitle(titleSource))
     if (!newSession) return
     currentSessionId.value = String(newSession.id)
     currentSessionTitle.value = newSession.title || '新对话'
@@ -494,11 +623,17 @@ const handleSend = async () => {
 
   // 保存用户消息
   const userMsg = await chatSessionApi.appendMessage(currentSessionId.value, { role: 'user', content: finalText })
-  // 如果是新会话，更新标题
-  if (messagesList.value.length <= 1) {
-    const title = formatSessionTitle(text || '新对话')
-    await updateSessionTitle(currentSessionId.value, title)
-    currentSessionTitle.value = title
+  // 标题仍为默认「新对话」时用首条有效内容更新（含仅上传附件）
+  const stillDefault =
+    !currentSessionTitle.value
+    || currentSessionTitle.value === '新对话'
+    || messagesList.value.length <= 1
+  if (stillDefault) {
+    const title = formatSessionTitle(titleSource)
+    if (title && title !== '新对话') {
+      await updateSessionTitle(currentSessionId.value, title)
+      currentSessionTitle.value = title
+    }
   }
   messagesList.value.push(userMsg.data.data)
 
@@ -569,7 +704,17 @@ const stopPolling = () => {
 
 // 初始化：获取活跃运行列表，若当前会话在运行则重连
 onMounted(async () => {
-  loadSessions()
+  await loadSessions()
+  const wantSession = route.query.sessionId
+  if (typeof wantSession === 'string' && wantSession && wantSession !== currentSessionId.value) {
+    const found = [...pinnedSessions.value, ...otherSessions.value]
+      .find(s => String(s.id) === wantSession)
+    if (found) {
+      await handleSelectSession(found)
+    } else {
+      await selectSession({ id: wantSession, title: '对话' } as ChatSessionVO)
+    }
+  }
   try {
     const activeIds = await getActiveRuns()
     runningSessions.value = new Set(activeIds)
@@ -587,7 +732,127 @@ onMounted(async () => {
   } catch {
     // 忽略初始化错误
   }
+  if (matterId.value && currentSessionId.value) {
+    void syncMatterChat(currentSessionId.value, true)
+  }
 })
+
+watch(
+  () => [matterId.value, currentSessionId.value] as const,
+  ([mid, sid]) => {
+    if (mid) {
+      void refreshMatterDiagramMode()
+    }
+    if (mid && sid) {
+      void syncMatterChat(sid, false)
+    }
+  },
+)
+
+watch(isRunning, (running, wasRunning) => {
+  if (wasRunning && !running && matterId.value && currentSessionId.value) {
+    void (async () => {
+      await syncMatterChat(currentSessionId.value!, true)
+      await registerExportFromTools()
+    })()
+  }
+})
+
+async function syncMatterChat(sid: string, importNow: boolean) {
+  if (!matterId.value || !sid) return
+  try {
+    await pkMatterApi.bindSession(matterId.value, sid)
+    if (importNow) {
+      await pkMatterApi.importSession(matterId.value, sid)
+    }
+  } catch (err) {
+    console.warn('[PK] 同步案件对话失败', err)
+    message.error('同步案件对话失败，请稍后在案件页点击「从对话同步」')
+  }
+}
+
+async function registerExportFromToolResult(toolName: string, resultRaw?: string) {
+  if (!matterId.value || toolName !== 'pk_export_disclosure' || !resultRaw) return false
+  try {
+    const obj = JSON.parse(resultRaw) as Record<string, unknown>
+    let result: Record<string, unknown> = obj
+    if (typeof obj.result === 'string') {
+      try {
+        result = JSON.parse(obj.result) as Record<string, unknown>
+      } catch {
+        result = obj
+      }
+    } else if (obj.result && typeof obj.result === 'object') {
+      result = obj.result as Record<string, unknown>
+    }
+    const exportId = String(result.export_id || result.exportId || '')
+    if (!exportId || result.ok === false) {
+      if (result.message) {
+        message.warning(`Word 导出未完成：${result.message}`)
+      }
+      return false
+    }
+    await pkMatterApi.exportDocx(matterId.value, {
+      exportId,
+      title: String(result.filename || matterId.value).replace(/\.docx$/i, ''),
+      diagramMode: matterDiagramMode.value,
+    })
+    message.success('Word 已生成并登记到案件，可在案件页下载')
+    return true
+  } catch (err) {
+    console.warn('[PK] 登记导出 Word 失败', err)
+    message.error('Word 已渲染但登记到案件失败，请在案件页点击「导出 Word（自动渲染）」重试')
+    return false
+  }
+}
+
+async function ensureWordFromDisclosureDraft() {
+  if (!matterId.value) return false
+  try {
+    const [artifactsRes, matterRes] = await Promise.all([
+      pkMatterApi.listArtifacts(matterId.value),
+      pkMatterApi.detail(matterId.value),
+    ])
+    const artifacts = artifactsRes.data.data ?? []
+    const hasMd = artifacts.some(a => a.artifactType === 'disclosure_md')
+    const hasDocx = artifacts.some(a => a.artifactType === 'docx')
+    if (!hasMd || hasDocx) return false
+    await pkMatterApi.exportDocx(matterId.value, {
+      title: matterRes.data.data?.title || 'disclosure',
+      diagramMode: defaultDiagramMode(matterRes.data.data?.metaJson),
+    })
+    message.success('交底已同步，已自动机器渲染 Word（含 mermaid 附图），可在案件页下载')
+    return true
+  } catch (err) {
+    console.warn('[PK] 自动导出 Word 失败', err)
+    message.warning('交底已写入案件，Word 自动渲染未成功；请在案件页点击「导出 Word（自动渲染）」一键完成')
+    return false
+  }
+}
+
+async function registerExportFromTools() {
+  if (!matterId.value) return
+  let exported = false
+  for (const msg of [...messagesList.value].reverse()) {
+    if (msg.role !== 'tool' || !msg.content) continue
+    try {
+      const obj = JSON.parse(msg.content) as Record<string, unknown>
+      if (obj.name !== 'pk_export_disclosure') continue
+      const resultRaw = typeof obj.result === 'string'
+        ? obj.result
+        : JSON.stringify(obj.result ?? obj)
+      if (await registerExportFromToolResult('pk_export_disclosure', resultRaw)) {
+        exported = true
+        break
+      }
+    } catch {
+      /* 跳过无法解析的工具消息 */
+    }
+  }
+  if (!exported) {
+    await ensureWordFromDisclosureDraft()
+  }
+}
 
 // 组件卸载时清理 poll timer
 onBeforeUnmount(() => {
@@ -671,6 +936,8 @@ watch([isRunning, isStopping], ([running, stopping]) => {
       :current-plan="currentPlan"
       :context-usage="contextUsage"
       :memory-compression-active="memoryCompressionActive"
+      :matter-id="matterId || undefined"
+      :diagram-preview-mode="matterDiagramMode"
       @update:input-value="inputText = $event"
       @update:uploaded-files="uploadedFiles = $event"
       @memory="handleMemoryChange"
@@ -687,6 +954,9 @@ watch([isRunning, isStopping], ([running, stopping]) => {
       @interaction-submit="handleInteractionSubmit"
       @uip-retry="handleUIPRetry"
       @vep-retry="handleVEPRetry"
+      @mermaid-retry="handleMermaidRetry"
+      @tool-abort="handleToolAbort"
+      @tool-direct-export="handleToolDirectExport"
     />
     <!-- 工作空间面板（作为 flex 子项从右侧滑出） -->
     <WorkspacePanel

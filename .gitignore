@@ -48,3 +48,26 @@ build/
 .codex_tmp
 logs
 .m2
+
+### PatentKing local / Docker
+docker/.env
+docker/data/
+docker/patent-tools/.venv/
+**/__pycache__/
+*.pyc
+patent-skills/_packaged/
+.venv/
+venv/
+
+### Local data, run traces, and third-party skill corpora
+ground_truth_file/*
+!ground_truth_file/README.md
+test/*.pdf
+scripts/pk-all-types-results.json
+scripts/pk-all-types-run.log
+scripts/*.log
+patent-skills/PatentRadar/
+patent-skills/fuyuxiang-patent-disclosure-skill/
+patent-skills/handsomestWei-patent-disclosure-skill/
+patent-skills/paper2patent/
+patent-skills/patent-mining-disclosure-skill/

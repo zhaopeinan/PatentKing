@@ -1,0 +1,7 @@
+interface:
+  display_name: "Tokenlab ImageGen"
+  short_description: "通过 Tokenlab gpt-image-2 生成图片"
+  brand_color: "#1373A5"
+  default_prompt: "Use $tokenlab-imagegen to generate an image from my prompt and save it to a local file."
+policy:
+  allow_implicit_invocation: true

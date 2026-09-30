@@ -13,7 +13,8 @@ import {
   KeyOutlined,
   ApartmentOutlined,
   GlobalOutlined,
-  CloudServerOutlined
+  CloudServerOutlined,
+  PictureOutlined
 } from '@ant-design/icons-vue'
 import { useAccountStore } from '@/stores'
 
@@ -43,6 +44,7 @@ const menuItems = computed(() => {
     items.push(
       // { key: 'allAccounts', label: '全部账户', icon: TeamOutlined },
       { key: 'apiKeys', label: 'API Keys', icon: KeyOutlined },
+      { key: 'pkTokenlab', label: 'PatentKing 生图', icon: PictureOutlined },
       { key: 'storageManagement', label: '存储管理', icon: DatabaseOutlined },
       { key: 'systemParams', label: '系统参数', icon: ControlOutlined },
       { key: 'executionNodes', label: '服务监控', icon: CloudServerOutlined }

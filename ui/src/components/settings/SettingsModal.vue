@@ -14,6 +14,7 @@ import SystemParams from './SystemParams.vue'
 import SystemIntro from './SystemIntro.vue'
 import TenantSettings from './TenantSettings.vue'
 import TenantDiscovery from './TenantDiscovery.vue'
+import PkTokenlabSettings from './PkTokenlabSettings.vue'
 import ExecutionNodes from './ExecutionNodes.vue'
 
 /**
@@ -45,6 +46,7 @@ defineExpose({
       <MyAccount v-if="currentMenu === 'myAccount'" />
       <AllAccounts v-else-if="currentMenu === 'allAccounts'" v-permission="['TENANT_EDITOR','TENANT_ADMIN','TENANT_OWNER']" />
       <ApiKeys v-else-if="currentMenu === 'apiKeys'" v-permission="['TENANT_EDITOR','TENANT_ADMIN','TENANT_OWNER']" />
+      <PkTokenlabSettings v-else-if="currentMenu === 'pkTokenlab'" v-permission="['TENANT_ADMIN','TENANT_OWNER']" />
       <StorageManagement v-else-if="currentMenu === 'storageManagement'" v-permission="['TENANT_EDITOR','TENANT_ADMIN','TENANT_OWNER']" />
       <SystemParams v-else-if="currentMenu === 'systemParams'" v-permission="['TENANT_EDITOR','TENANT_ADMIN','TENANT_OWNER']" />
       <TenantSettings v-else-if="currentMenu === 'tenantSettings'" />

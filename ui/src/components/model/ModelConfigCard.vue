@@ -101,7 +101,7 @@ const avatarClass = computed(() => ({
 const cornerTooltip = computed(() => {
   if (isDisabled.value) return '模型已停用'
   if (isChecking.value) return '正在检测连接中，请稍候'
-  if (isNotChecked.value) return '尚未进行连接性检测，可通过菜单中的「测试连接」进行检测'
+  if (isNotChecked.value) return '尚未进行连接性检测，请点击卡片上的「测试连接」'
   if (isFailed.value) {
     return props.data.connectivityMessage || '连接检测失败，请检查模型配置或供应商API密钥'
   }
@@ -165,7 +165,7 @@ const formattedTemperature = computed(() => {
     <div class="card-header flex items-center gap-sm">
       <div class="card-avatar-wrapper">
         <ATooltip :title="cornerTooltip" placement="top">
-          <div class="card-avatar flex-center" :class="avatarClass">
+          <div class="card-avatar flex-center" :class="avatarClass" @click.stop="emit('test', data.id as string)">
             <LoadingOutlined v-if="isChecking" spin />
             <img v-else :src="providerLogo" class="provider-logo" />
           </div>
@@ -183,7 +183,16 @@ const formattedTemperature = computed(() => {
         </div>
       </ATooltip>
 
-      <ADropdown :trigger="['hover']">
+      <AButton
+        type="link"
+        size="small"
+        :loading="isChecking"
+        v-permission="['TENANT_EDITOR','TENANT_ADMIN','TENANT_OWNER']"
+        @click.stop="emit('test', data.id as string)"
+      >
+        测试连接
+      </AButton>
+      <ADropdown :trigger="['click']">
         <AButton type="text" size="small" v-permission="['TENANT_EDITOR','TENANT_ADMIN','TENANT_OWNER']">
           <EllipsisOutlined />
         </AButton>

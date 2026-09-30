@@ -8,6 +8,9 @@ server:
 
 apboa:
   storage-mode: ${APBOA_STORAGE_MODE:shared}
+  # 国知局 Playwright / Tokenlab 出图等自定义工具常超过默认 60s
+  tool:
+    execution-timeout-seconds: ${APBOA_TOOL_EXECUTION_TIMEOUT_SECONDS:600}
 
 agentscope:
   agui:

@@ -29,6 +29,11 @@
             <groupId>com.hxh.apboa.next</groupId>
             <artifactId>biz-sk</artifactId>
         </dependency>
+        <!-- PatentKing 动态工具（查新/导出）在 runtime 执行，需 sidecar 支持类 -->
+        <dependency>
+            <groupId>com.hxh.apboa.next</groupId>
+            <artifactId>biz-pk-matter</artifactId>
+        </dependency>
 
         <!-- 心跳上报模块 -->
         <dependency>

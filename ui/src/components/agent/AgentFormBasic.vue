@@ -5,6 +5,7 @@
  */
 <script setup lang="ts">
 import { ref, computed, defineComponent } from 'vue'
+import { message } from 'ant-design-vue'
 import {InfoCircleOutlined, PlusOutlined} from '@ant-design/icons-vue'
 
 /**
@@ -100,8 +101,13 @@ const rules = {
  */
 const addTag = (e: Event) => {
   e.preventDefault()
-  if (newTagName.value && !filteredTags.value.includes(newTagName.value)) {
-    formData.value.tag = newTagName.value
+  const name = newTagName.value?.trim()
+  if (name && name.length > 6) {
+    message.warning('标签长度不能超过6个字符')
+    return
+  }
+  if (name && !filteredTags.value.includes(name)) {
+    formData.value.tag = name
   }
   newTagName.value = ''
   setTimeout(() => {
@@ -166,6 +172,7 @@ defineExpose({
               v-model:value="newTagName"
               style="width: 300px"
               placeholder="输入新标签"
+              :maxlength="6"
             />
             <AButton type="text" @click="addTag">
               <template #icon>

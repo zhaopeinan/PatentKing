@@ -105,6 +105,7 @@ services:
       WEBSOCKET_ENABLED: ${WEBSOCKET_ENABLED:-true}
       WEBSOCKET_HOST: ${WEBSOCKET_HOST:-apboa-websocket}
       WEBSOCKET_PORT: ${WEBSOCKET_PORT:-3064}
+      PK_TOOLS_BASE_URL: ${PK_TOOLS_BASE_URL:-http://patent-tools:3070}
       TZ: Asia/Shanghai
     volumes:
       - ${LOG_PATH:-./logs}/console:/app/logs
@@ -115,6 +116,8 @@ services:
       apboa-mysql:
         condition: service_healthy
       apboa-redis:
+        condition: service_healthy
+      patent-tools:
         condition: service_healthy
     networks:
       - apboa_simple
@@ -209,11 +212,16 @@ services:
       APBOA_NODE_ID: ${APBOA_NODE_ID}
       APBOA_HOST_NAME: ${APBOA_HOST_NAME}
       APBOA_HOST_IP: ${APBOA_HOST_IP}
+      PK_TOOLS_BASE_URL: ${PK_TOOLS_BASE_URL:-http://patent-tools:3070}
+      # 自定义工具超时（秒）：国知局查新 / Word 出图常 >60s
+      APBOA_TOOL_EXECUTION_TIMEOUT_SECONDS: ${APBOA_TOOL_EXECUTION_TIMEOUT_SECONDS:-600}
       # Python/Node 依赖安装落盘目录（容器重建后依赖持久化）
       PIP_TARGET: /opt/tools/pylib
       PYTHONPATH: /opt/tools/pylib
       NPM_CONFIG_PREFIX: /opt/tools/npm-global
       TZ: Asia/Shanghai
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ${LOG_PATH:-./logs}/runtime:/app/logs
       - ${DATA_PATH:-./data}/.apboa:/app/.apboa
@@ -305,6 +313,35 @@ services:
     depends_on:
       apboa-redis:
         condition: service_healthy
+    networks:
+      - apboa_simple
+
+  # ==================== PatentKing 专利工具 sidecar ====================
+  patent-tools:
+    build:
+      context: ..
+      dockerfile: docker/patent-tools/Dockerfile
+    container_name: patentking-patent-tools
+    restart: unless-stopped
+    dns:
+      - 223.5.5.5
+      - 114.114.114.114
+      - 8.8.8.8
+    environment:
+      TZ: Asia/Shanghai
+      PK_SKILL_TOOLS: /app/vendor
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      PK_CNIPA_MAX_ATTEMPTS: "3"
+      PK_CNIPA_EPUB_BASES: "https://epub.cnipa.gov.cn/,http://epub.cnipa.gov.cn/"
+    ports:
+      - "${PATENT_TOOLS_PORT:-3070}:3070"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:3070/healthz')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
     networks:
       - apboa_simple
 

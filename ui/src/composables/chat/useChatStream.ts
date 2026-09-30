@@ -21,7 +21,16 @@ export function useChatStream(
   memoryActive?: import('vue').Ref<boolean>,
   planActive?: import('vue').Ref<boolean>,
   toolProcessActive?: import('vue').Ref<boolean>,
-  onMessageSaved?: (chatMsg: ChatMessageVO) => void) {
+  onMessageSaved?: (chatMsg: ChatMessageVO) => void,
+  extraForwarded?: import('vue').Ref<Record<string, unknown>>,
+  onToolCompleted?: (tool: {
+    id: string
+    name: string
+    args: string
+    result?: string
+    elapsed?: number
+  }) => void,
+) {
 
   const { userInfo } = useAccountStore()
   const { runs: subAgentRuns, acceptCustomEvent, reset: resetSubAgentRuns } = useSubAgentRuns()
@@ -43,7 +52,8 @@ export function useChatStream(
     memoryActive: memoryActive?.value ?? false,
     planActive: planActive?.value ?? false,
     toolProcessActive: toolProcessActive?.value ?? false,
-    userInfo: userInfo
+    userInfo: userInfo,
+    ...(extraForwarded?.value || {})
   })
 
   // 流式内容
@@ -57,9 +67,13 @@ export function useChatStream(
   let stopRequestId = 0
   let compressionNoticeTimer: ReturnType<typeof setTimeout> | null = null
 
-  /** 等待后端确认 Agent 真正结束，避免停止请求返回后立即复用仍在运行的 Agent。 */
+  /** 停止等待后端确认的最长时间（工具如 pk_export_disclosure 可能阻塞较久） */
+  const STOP_ACK_TIMEOUT_MS = 20_000
+
+  /** 等待后端确认 Agent 结束；超时后仍释放前端停止态，避免界面长期卡死。 */
   const waitForRunStopped = async (sessionId: string): Promise<boolean> => {
-    while (true) {
+    const deadline = Date.now() + STOP_ACK_TIMEOUT_MS
+    while (Date.now() < deadline) {
       try {
         const status = await getRunStatus(sessionId)
         if (!status.running || status.state === 'COMPLETED') return true
@@ -68,6 +82,7 @@ export function useChatStream(
       }
       await new Promise(resolve => setTimeout(resolve, 500))
     }
+    return false
   }
 
   // 工具调用进度
@@ -220,34 +235,34 @@ export function useChatStream(
         // 计划追踪：处理工具结果
         onPlanToolResult(e.toolCallId)
 
-        try {
-          // 判断是否开启了显示工具调用
-          if (!(toolProcessActive?.value ?? true)) {
-            return
-          }
-          // 更新工具调用结果和耗时
-          toolCallsInProgress.value = toolCallsInProgress.value.map((t) =>
-            t.id === e.toolCallId ? { ...t, result: e.content, elapsed: Date.now() - t.startTime } : t
-          )
+        const elapsed = Date.now() - (toolCallsInProgress.value.find(t => t.id === e.toolCallId)?.startTime ?? Date.now())
+        toolCallsInProgress.value = toolCallsInProgress.value.map((t) =>
+          t.id === e.toolCallId ? { ...t, result: e.content, elapsed } : t
+        )
+        const completedTool = toolCallsInProgress.value.find((t) => t.id === e.toolCallId)
+        if (completedTool) {
+          onToolCompleted?.(completedTool)
+        }
 
-          // 保存当前完成的工具调用消息（仅保存刚完成的这一条）
+        try {
           const sid = currentSessionId.value
-          if (sid) {
-            const completedTool = toolCallsInProgress.value.find((t) => t.id === e.toolCallId)
-            if (completedTool) {
-              const contentToSave = buildToolCallsContent([completedTool])
-              if (contentToSave) {
-                onMessageSaved?.({
-                  id: nextIdBig(),
-                  sessionId: sid,
-                  role: 'tool',
-                  content: contentToSave,
-                  parentId: '',
-                  path: '',
-                  depth: 0,
-                  createdAt: ''
-                } as ChatMessageVO)
-              }
+          const matterBound = Boolean(
+            (extraForwarded?.value?.params as Record<string, unknown> | undefined)?.matterId
+          )
+          const saveHistory = (toolProcessActive?.value ?? true) || matterBound
+          if (sid && saveHistory && completedTool) {
+            const contentToSave = buildToolCallsContent([completedTool])
+            if (contentToSave) {
+              onMessageSaved?.({
+                id: nextIdBig(),
+                sessionId: sid,
+                role: 'tool',
+                content: contentToSave,
+                parentId: '',
+                path: '',
+                depth: 0,
+                createdAt: ''
+              } as ChatMessageVO)
             }
           }
         } finally {
@@ -420,6 +435,12 @@ export function useChatStream(
 
       // 只有后端确认 Agent 真正结束后，才清理思考、工具和压缩临时状态。
       stoppedConfirmed = sid ? await waitForRunStopped(sid) : true
+      if (!stoppedConfirmed) {
+        message.warning(
+          '已停止对话；若 Word 仍在后台渲染，可使用工具卡片「直接导出」或到案件页重试',
+          6,
+        )
+      }
     } finally {
       // 会话切换后旧停止请求的轮询不能清理新会话的界面状态。
       if (requestId !== stopRequestId || currentSessionId.value !== sid) return
@@ -434,8 +455,7 @@ export function useChatStream(
         clearTimeout(compressionNoticeTimer)
         compressionNoticeTimer = null
       }
-      // 超时后继续保持停止中状态，防止后端仍占用 Agent 时再次发送请求。
-      if (stoppedConfirmed) isStopping.value = false
+      isStopping.value = false
     }
   }
 

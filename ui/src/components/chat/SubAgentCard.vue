@@ -20,6 +20,7 @@ defineEmits<{
   (e: 'interactionSubmit', payload: InteractionSubmitPayload): void
   (e: 'uipRetry', uipCode: string): void
   (e: 'vepRetry', vepCode: string): void
+  (e: 'mermaidRetry', payload: import('@/utils/chat/mermaid').MermaidRetryPayload): void
 }>()
 
 const isTerminal = (status?: string) =>
@@ -168,6 +169,7 @@ watch(
           @interaction-submit="$emit('interactionSubmit', $event)"
           @uip-retry="$emit('uipRetry', $event)"
           @vep-retry="$emit('vepRetry', $event)"
+          @mermaid-retry="$emit('mermaidRetry', $event)"
         />
       </div>
     </Transition>

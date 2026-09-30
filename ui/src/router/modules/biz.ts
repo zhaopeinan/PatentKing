@@ -182,6 +182,24 @@ const bizRoutes: AppRouteRecordRaw[] = [
         },
       },
       {
+        path: RoutePaths.PK_MATTER,
+        name: RouteNames.PK_MATTER,
+        component: () => import('@/views/PatentKing/Matter/index.vue'),
+        meta: {
+          title: '成果案件',
+          hidden: false
+        },
+      },
+      {
+        path: RoutePaths.PK_MATTER_DETAIL,
+        name: RouteNames.PK_MATTER_DETAIL,
+        component: () => import('@/views/PatentKing/Matter/Detail.vue'),
+        meta: {
+          title: '案件详情',
+          hidden: true
+        },
+      },
+      {
         path: RoutePaths.CHAT_CLUSTER,
         name: RouteNames.CHAT_CLUSTER,
         component: () => import('@/views/ChatCluster/index.vue'),

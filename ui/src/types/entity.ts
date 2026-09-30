@@ -600,3 +600,15 @@ export interface RagDocumentChunk {
   metadata: string | null
   createdAt: string
 }
+
+export interface PkMatter extends BaseEntity {
+  title: string
+  matterType: string
+  status: string
+  agentDefinitionId?: string
+  workspaceRelPath?: string
+  inventorsJson?: string
+  metaJson?: string
+  remark?: string
+  tenantId?: string
+}

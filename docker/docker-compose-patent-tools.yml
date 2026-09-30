@@ -1,0 +1,38 @@
+# Optional profile: docker compose --profile patent-tools -f docker-compose-simple.yml up -d
+# Or standalone: see docs/dev-environment.md
+
+services:
+  patent-tools:
+    build:
+      context: ..
+      dockerfile: docker/patent-tools/Dockerfile
+    container_name: patentking-patent-tools
+    restart: unless-stopped
+    dns:
+      - 223.5.5.5
+      - 114.114.114.114
+      - 8.8.8.8
+    ports:
+      - "${PATENT_TOOLS_PORT:-3070}:3070"
+    environment:
+      TZ: Asia/Shanghai
+      PK_SKILL_TOOLS: /app/vendor
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      PK_CNIPA_MAX_ATTEMPTS: "3"
+      PK_CNIPA_EPUB_BASES: "https://epub.cnipa.gov.cn/,http://epub.cnipa.gov.cn/"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:3070/healthz')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    networks:
+      - apboa_simple
+    profiles:
+      - patent-tools
+
+networks:
+  apboa_simple:
+    external: true
+    name: docker_apboa_simple

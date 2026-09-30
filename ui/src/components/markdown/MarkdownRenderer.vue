@@ -6,6 +6,9 @@
         v-else-if="part.type === 'mermaid'"
         :code="part.code as string"
         :is-streaming="isStreaming"
+        :disabled="disabled || readonlyInteraction"
+        :diagram-mode="diagramMode"
+        @retry="onMermaidRetry"
       />
       <UIPRenderer
         v-else-if="part.type === 'uip'"
@@ -35,18 +38,25 @@ import VEPRenderer from '@/components/markdown/vep/VEPRenderer.vue'
 import { extractUIPBlocks } from '@/utils/chat/uip.ts'
 import { extractVEPBlocks } from '@/utils/chat/vep'
 import type { InteractionSubmitPayload } from '@/components/markdown/uip/types'
+import {
+  extractMermaidContext,
+  type MermaidRetryPayload,
+} from '@/utils/chat/mermaid'
 
 const props = defineProps<{
   content: string
   disabled?: boolean
   isStreaming?: boolean
   readonlyInteraction?: boolean
+  /** png | auto — 来自案件交付偏好 */
+  diagramMode?: string
 }>()
 
 const emit = defineEmits<{
   interactionSubmit: [payload: InteractionSubmitPayload]
   uipRetry: [uipCode: string]
   vepRetry: [vepCode: string]
+  mermaidRetry: [payload: MermaidRetryPayload]
 }>()
 
 const container = ref<HTMLElement>()
@@ -61,6 +71,15 @@ function onUipRetry(uipCode: string) {
 
 function onVepRetry(vepCode: string) {
   if (!props.readonlyInteraction) emit('vepRetry', vepCode)
+}
+
+function onMermaidRetry(payload: MermaidRetryPayload) {
+  if (!props.readonlyInteraction) {
+    emit('mermaidRetry', {
+      ...payload,
+      messageContext: extractMermaidContext(props.content, payload.code),
+    })
+  }
 }
 
 /** 内容分片：html、mermaid 图表、uip 交互组件、vep 视觉增强 */

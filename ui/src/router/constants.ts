@@ -90,6 +90,9 @@ export const RouteNames = {
   REVIEW_AGENT: 'ReviewAgent',
   REVIEW_WORKFLOW: 'ReviewWorkflow',
 
+  PK_MATTER: 'PkMatter',
+  PK_MATTER_DETAIL: 'PkMatterDetail',
+
   // 错误页面
   NOT_FOUND: 'NotFound'
 } as const
@@ -174,6 +177,9 @@ export const RoutePaths = {
   // 审查管理
   REVIEW_AGENT: 'review/agent',
   REVIEW_WORKFLOW: 'review/workflow',
+
+  PK_MATTER: 'patent-matters',
+  PK_MATTER_DETAIL: 'patent-matters/:id',
 
   // 错误页面
   NOT_FOUND: '/:pathMatch(.*)*',

@@ -68,14 +68,37 @@
         <!-- 渲染中 → 加载动画 -->
         <div v-if="isRendering && !svgContent" class="placeholder">
           <div class="loading-spinner"></div>
-          <span>渲染中...</span>
+          <span>{{ renderStatus }}</span>
         </div>
         <!-- 已渲染 → SVG 图表 -->
-        <div v-else-if="svgContent" ref="svgWrapper" class="svg-wrapper" v-html="svgContent"></div>
-        <!-- 渲染失败 → 代码备选 -->
+        <div v-else-if="svgContent" ref="svgWrapper" class="svg-wrapper">
+          <div v-if="isTokenlabAuto" class="tokenlab-auto-badge overlay">
+            结构预览 · Word 导出时由 Tokenlab 生图
+          </div>
+          <div v-html="svgContent"></div>
+        </div>
+        <!-- 渲染失败 → 代码备选 + 手动重试 -->
         <div v-else class="code-fallback">
+          <div v-if="isTokenlabAuto" class="tokenlab-auto-pane">
+            <div class="tokenlab-auto-badge">Tokenlab 自动生成</div>
+            <p class="tokenlab-auto-desc">
+              Word 导出时将调用 Tokenlab 生图。下方为结构源码（对话预览渲染失败时回退显示）。
+            </p>
+          </div>
           <pre class="code-block">{{ displayCode }}</pre>
-          <div v-if="renderError" class="error-message">{{ renderError }}</div>
+          <div v-if="renderError" class="error-panel">
+            <div class="error-title">Mermaid 解析失败</div>
+            <pre class="error-detail">{{ renderError }}</pre>
+          </div>
+          <button
+            v-if="showManualRetry"
+            class="mermaid-retry-btn"
+            :disabled="retrying"
+            @click="onManualRetry"
+          >
+            {{ retrying ? '已请求助手修复…' : '重新生成' }}
+          </button>
+          <p v-if="retryHint" class="retry-hint">{{ retryHint }}</p>
         </div>
       </div>
 
@@ -90,7 +113,14 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
+import { message } from 'ant-design-vue'
 import mermaid from 'mermaid'
+import {
+  MERMAID_MAX_RENDER_ATTEMPTS,
+  buildMermaidRenderAttempts,
+  decodeMermaidHtmlEntities,
+  type MermaidRetryPayload,
+} from '@/utils/chat/mermaid'
 
 // ---------- Mermaid 初始化 ----------
 mermaid.initialize({
@@ -109,35 +139,15 @@ mermaid.initialize({
 const props = defineProps<{
   /** Mermaid 代码块原始内容 */
   code: string
+  /** 历史消息只读，不显示「重新生成」 */
+  disabled?: boolean
+  /** png | auto — auto 时不做客户端 mermaid 渲染 */
+  diagramMode?: string
 }>()
 
-// ---------- 辅助函数 ----------
-const decodeHtmlEntities = (str: string): string => {
-  return str
-    .replace(/&gt;/g, '>')
-    .replace(/&lt;/g, '<')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-}
-
-const preprocessMermaidCode = (code: string): string => {
-  let processed = code.trim()
-  processed = decodeHtmlEntities(processed)
-  processed = processed.replace(/^```mermaid\s*\n?/, '').replace(/\n?```$/, '')
-  return processed
-}
-
-// 语法快速预检 (比 render 更轻量)
-const isValidMermaidCode = (code: string): boolean => {
-  try {
-    mermaid.parse(code)
-    return true
-  } catch {
-    return false
-  }
-}
+const emit = defineEmits<{
+  retry: [payload: import('@/utils/chat/mermaid').MermaidRetryPayload]
+}>()
 
 // ---------- 响应式状态 ----------
 const containerRef = ref<HTMLElement>()
@@ -148,6 +158,10 @@ const viewMode = ref<'diagram' | 'code'>('diagram')
 const svgContent = ref<string | null>(null)
 const renderError = ref<string | null>(null)
 const isRendering = ref(false)
+const attemptNo = ref(0)
+const manualRetryAvailable = ref(false)
+const retrying = ref(false)
+const retryHint = ref<string | null>(null)
 const scale = ref(1.0)
 const isFullscreen = ref(false)
 const copySuccess = ref(false)
@@ -162,52 +176,113 @@ const panStartPosX = ref(0)
 const panStartPosY = ref(0)
 
 let renderId = 0
+const lastAutoFixAttempts = ref<string[]>([])
 
-// 用于显示的代码 (直接使用原始 props.code)
-const displayCode = computed(() => decodeHtmlEntities(props.code))
+const displayCode = computed(() => decodeMermaidHtmlEntities(props.code))
+const isTokenlabAuto = computed(() => {
+  const m = (props.diagramMode || 'png').toLowerCase()
+  return m === 'auto' || m === 'tokenlab' || m === 'image-api'
+})
+const showManualRetry = computed(() => manualRetryAvailable.value && !props.disabled && !isTokenlabAuto.value)
+const renderStatus = computed(() => {
+  if (attemptNo.value <= 1) return '渲染中...'
+  return `语法无效，正在第 ${attemptNo.value}/${MERMAID_MAX_RENDER_ATTEMPTS} 次自动修复...`
+})
 
-// ---------- 渲染逻辑 ----------
+async function parseMermaid(code: string): Promise<void> {
+  const result = mermaid.parse(code)
+  if (result && typeof (result as Promise<unknown>).then === 'function') {
+    await result
+  }
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+// ---------- 渲染逻辑：最多自动尝试 3 次（原文 + 引号修复 + 符号替换）----------
 const doRender = async () => {
+  // auto 模式：对话内仍做 Mermaid 结构预览；Tokenlab 生图仅在 Word 导出时发生
   if (!props.code) {
     svgContent.value = null
     renderError.value = null
+    manualRetryAvailable.value = false
     return
   }
 
   const currentRenderId = ++renderId
-  const processed = preprocessMermaidCode(props.code)
-
-  // 快速预检：如果语法明显无效，不进行重量级渲染，直接显示代码备选
-  if (!isValidMermaidCode(processed)) {
-    if (currentRenderId === renderId) {
-      svgContent.value = null
-      renderError.value = 'Mermaid 语法无效或不完整'
-      isRendering.value = false
-    }
+  const candidates = buildMermaidRenderAttempts(props.code)
+  if (candidates.length === 0) {
+    svgContent.value = null
+    renderError.value = 'Mermaid 内容为空'
+    manualRetryAvailable.value = !props.disabled && !isTokenlabAuto.value
     return
   }
 
   isRendering.value = true
   renderError.value = null
+  manualRetryAvailable.value = false
+  retryHint.value = null
+  svgContent.value = null
+  lastAutoFixAttempts.value = []
 
+  let lastError = 'Mermaid 语法无效或不完整'
+  const tried: string[] = []
   try {
-    const id = `mermaid-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
-    const { svg } = await mermaid.render(id, processed)
+    for (let i = 0; i < MERMAID_MAX_RENDER_ATTEMPTS; i++) {
+      if (currentRenderId !== renderId) return
+      attemptNo.value = i + 1
+      const source = candidates[Math.min(i, candidates.length - 1)] as string
+      tried.push(source)
+      try {
+        await parseMermaid(source)
+        const id = `mermaid-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+        const { svg } = await mermaid.render(id, source)
+        if (currentRenderId !== renderId) return
+        svgContent.value = svg
+        renderError.value = null
+        manualRetryAvailable.value = false
+        lastAutoFixAttempts.value = tried
+        return
+      } catch (error) {
+        lastError = errorText(error)
+        if (i < MERMAID_MAX_RENDER_ATTEMPTS - 1) {
+          await sleep(160)
+        }
+      }
+    }
 
     if (currentRenderId !== renderId) return
-
-    svgContent.value = svg
-    renderError.value = null
-  } catch (error) {
-    if (currentRenderId !== renderId) return
-    console.error('Mermaid 渲染失败:', error)
+    console.error('Mermaid 渲染失败（已自动重试 3 次）:', lastError)
     svgContent.value = null
-    renderError.value = error instanceof Error ? error.message : String(error)
+    renderError.value = lastError
+    lastAutoFixAttempts.value = tried
+    manualRetryAvailable.value = !isTokenlabAuto.value
   } finally {
     if (currentRenderId === renderId) {
       isRendering.value = false
     }
   }
+}
+
+function onManualRetry() {
+  if (retrying.value || props.disabled || isTokenlabAuto.value) return
+  retrying.value = true
+  retryHint.value = '已请求助手修复 Mermaid 语法，请等待回复中的新代码块。'
+  message.info('已请求助手修复 Mermaid 语法')
+  const payload: MermaidRetryPayload = {
+    code: displayCode.value,
+    error: renderError.value || '未知解析错误',
+    autoFixAttempts: lastAutoFixAttempts.value.length
+      ? [...lastAutoFixAttempts.value]
+      : buildMermaidRenderAttempts(props.code),
+  }
+  emit('retry', payload)
+  setTimeout(() => { retrying.value = false }, 8000)
 }
 
 const debouncedRender = useDebounceFn(doRender, 300)
@@ -469,6 +544,7 @@ onUnmounted(() => {
 }
 
 .svg-wrapper {
+  position: relative;
   display: inline-block;
   min-width: 100%;
   pointer-events: none; /* 让鼠标事件穿透到父元素，便于拖拽 */
@@ -481,6 +557,15 @@ onUnmounted(() => {
   margin: 0 auto;
   background-color: transparent;
   pointer-events: none; /* 让鼠标事件穿透到父元素，便于拖拽 */
+}
+
+.tokenlab-auto-badge.overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  margin-bottom: 0;
+  pointer-events: none;
 }
 
 /* 代码视图 / 备选显示 */
@@ -512,6 +597,85 @@ onUnmounted(() => {
   font-size: 13px;
   font-family: monospace;
   user-select: text;
+}
+
+.error-panel {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+}
+
+.error-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #b91c1c;
+  margin-bottom: 6px;
+}
+
+.error-detail {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #991b1b;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+
+.retry-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.tokenlab-auto-pane {
+  width: 100%;
+  padding: 12px;
+}
+
+.tokenlab-auto-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.tokenlab-auto-desc {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.mermaid-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #1677ff;
+  background: #fff;
+  border: 1px solid #1677ff;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mermaid-retry-btn:hover:not(:disabled) {
+  color: #fff;
+  background: #1677ff;
+}
+
+.mermaid-retry-btn:disabled {
+  color: #bfbfbf;
+  border-color: #d9d9d9;
+  cursor: not-allowed;
 }
 
 /* 占位与加载 */

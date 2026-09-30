@@ -1,3 +1,49 @@
+<h1 align="center">PatentKing 专利王</h1>
+
+<p align="center">
+  <strong>面向成果转化的开源专利智能体</strong><br/>
+  <strong>An open-source patent agent for technology transfer</strong>
+</p>
+
+<p align="center">
+  交底撰写 · 现有技术查新 · 审查意见答复 · 案件管理<br/>
+  Disclosure drafting · Prior-art search · Office-action replies · Matter management
+</p>
+
+PatentKing（专利王）把成果从技术材料推进到可交付的专利文稿。它跑在 [Apboa Next](https://github.com/huxuehao/apboa-next) 智能体平台上：平台负责模型、技能、会话和多租户；PatentKing 负责案件、交底流水线和专利工具。模型密钥、交底范文、论文原文和本地运行数据留在你自己的环境里，不随仓库发布。
+
+PatentKing moves a technical result toward a deliverable patent draft. It runs on the [Apboa Next](https://github.com/huxuehao/apboa-next) agent platform: the platform handles models, skills, sessions, and tenants; PatentKing handles matters, the disclosure pipeline, and patent tools. API keys, disclosure samples, source papers, and local run data stay in your own environment and are not published with this repository.
+
+## 能做什么 / What it does
+
+| 能力 | Capability | 说明 |
+|------|------------|------|
+| 交底撰写 | Disclosure drafting | 整理发明点，生成交底书，并导出 Word |
+| 现有技术查新 | Prior-art search | 检索对比文献，辅助判断新颖性 |
+| 论文转专利 | Paper to patent | 把论文材料整理成专利申请底稿 |
+| 审查答复 | Office-action reply | 整理创造性答辩提纲 |
+| 侵权对照 | Infringement / FTO | 按公开号做产品与权利要求对照 |
+| 案件管理 | Matter management | 按类型跟踪版本、会话和产物 |
+
+本地开发、Docker 启动和密钥配置见 [docs/dev-environment.md](docs/dev-environment.md)。案件模型与专利工具的取舍见 [docs/architecture/adr-001-matter-and-tools.md](docs/architecture/adr-001-matter-and-tools.md)。
+
+## 仓库里没有什么 / What is not in this repo
+
+- 模型 API Key、Tokenlab 生图密钥。在控制台里配置，不写进代码。
+- 交底金标准与论文 PDF（`ground_truth_file/`、`test/`）。目录说明还在，文件请本地自备。
+- 数据库、向量库、容器日志（`docker/data/`、`docker/logs/`）。
+- 第三方技能仓库里的专利评测集和全文包。需要时按 [patent-skills/README.md](patent-skills/README.md) 自行克隆。
+
+## 上游 / Upstream
+
+框架代码来自 Apboa Next，版权归 StudiousTiger，协议为 MIT。官方主站优先更新：[Gitee](https://gitee.com/studioustiger/apboa-next)，并同步到 [GitHub](https://github.com/huxuehao/apboa-next)。本仓库在其上增加 PatentKing 业务模块。
+
+The framework is Apboa Next, copyright StudiousTiger, MIT licensed. Upstream publishes first on [Gitee](https://gitee.com/studioustiger/apboa-next) and mirrors to [GitHub](https://github.com/huxuehao/apboa-next). This repository adds the PatentKing domain on top of that framework.
+
+---
+
+以下为上游框架说明。The sections below describe the upstream framework.
+
 <h1 align="center">Apboa Next</h1>
 
 <p align="center">

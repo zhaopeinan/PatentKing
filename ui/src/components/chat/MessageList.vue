@@ -16,6 +16,8 @@ const props = defineProps<{
   messages: DisplayMessage[]
   agentHasResult?: boolean
   toolCalls: Array<{ id: string; name: string; args: string; result?: string; elapsed?: number, needConfirm?: boolean }>
+  matterId?: string
+  diagramPreviewMode?: string
 }>()
 
 defineEmits<{
@@ -24,6 +26,9 @@ defineEmits<{
   (e: 'interactionSubmit', payload: InteractionSubmitPayload): void
   (e: 'uipRetry', uipCode: string): void
   (e: 'vepRetry', vepCode: string): void
+  (e: 'mermaidRetry', payload: import('@/utils/chat/mermaid').MermaidRetryPayload): void
+  (e: 'toolAbort'): void
+  (e: 'toolDirectExport', value: { name: string; args?: string }): void
 }>()
 
 /** 消息分组 */
@@ -152,10 +157,12 @@ function subAgentRunFor(message: DisplayMessage): SubAgentRunVO {
             :agent-has-result="agentHasResult"
             :is-streaming="msg.isStreaming"
             :is-memory-compression="msg.isMemoryCompression"
+            :diagram-preview-mode="diagramPreviewMode"
             @inputTagPreview="$emit('inputTagPreview', $event as FlatFileItem)"
             @interaction-submit="$emit('interactionSubmit', $event)"
             @uip-retry="$emit('uipRetry', $event)"
             @vep-retry="$emit('vepRetry', $event)"
+            @mermaid-retry="$emit('mermaidRetry', $event)"
           />
         </div>
       </div>
@@ -168,6 +175,7 @@ function subAgentRunFor(message: DisplayMessage): SubAgentRunVO {
         @interaction-submit="$emit('interactionSubmit', $event)"
         @uip-retry="$emit('uipRetry', $event)"
         @vep-retry="$emit('vepRetry', $event)"
+        @mermaid-retry="$emit('mermaidRetry', $event)"
       />
       <MessageItem
         v-else
@@ -181,10 +189,12 @@ function subAgentRunFor(message: DisplayMessage): SubAgentRunVO {
         :agent-has-result="agentHasResult"
         :is-streaming="firstMessage(group).isStreaming"
         :is-memory-compression="firstMessage(group).isMemoryCompression"
+        :diagram-preview-mode="diagramPreviewMode"
         @inputTagPreview="$emit('inputTagPreview', $event as FlatFileItem)"
         @interaction-submit="$emit('interactionSubmit', $event)"
         @uip-retry="$emit('uipRetry', $event)"
         @vep-retry="$emit('vepRetry', $event)"
+        @mermaid-retry="$emit('mermaidRetry', $event)"
       />
     </template>
     <TransitionGroup name="jelly">
@@ -198,7 +208,10 @@ function subAgentRunFor(message: DisplayMessage): SubAgentRunVO {
         :elapsed="t.elapsed"
         :loading="t.result == null"
         :need-confirm="t.needConfirm"
+        :matter-id="matterId"
         @toolContent="(content: any) => $emit('toolContent', content)"
+        @toolAbort="$emit('toolAbort')"
+        @toolDirectExport="(v) => $emit('toolDirectExport', v)"
       />
     </TransitionGroup>
   </div>
